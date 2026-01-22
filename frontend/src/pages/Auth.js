@@ -21,9 +21,13 @@ const Auth = () => {
         ? await login(email, password)
         : await register(email, password);
       
-      setAuthToken(response.data.access_token);
+      await setAuthToken(response.data.access_token);
       toast.success(isLogin ? 'Login realizado' : 'Cadastro realizado');
-      navigate('/sessions');
+      
+      // Aguardar um pouco para garantir que o estado foi atualizado
+      setTimeout(() => {
+        navigate('/sessions');
+      }, 100);
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Erro ao autenticar');
     } finally {
