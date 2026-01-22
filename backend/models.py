@@ -133,4 +133,5 @@ class ReportResponse(BaseModel):
     padroes_apresentador: List[str]
     pontos_sustentacao: List[str]
     veredito: str
+    momento_virada: Optional[Dict[str, Any]] = None
     generated_at: str
