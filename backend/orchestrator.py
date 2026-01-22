@@ -31,38 +31,41 @@ class SharkAgent:
         has_numbers = answer_quality.get('has_numbers', False)
         is_direct = answer_quality.get('is_direct', True)
         
-        # Lógica específica por arquétipo
+        # Lógica específica por arquétipo (mais agressiva)
         if self.archetype['id'] == 'financeiro':
             if not has_numbers:
-                self.state.interest -= 15
-                self.state.trust_founder -= 10
+                self.state.interest -= 20  # Aumentado de 15
+                self.state.trust_founder -= 15  # Aumentado de 10
             if is_evasive:
-                self.state.patience -= 20
+                self.state.patience -= 30  # Aumentado de 20
                 
         elif self.archetype['id'] == 'operador':
             if is_evasive:
-                self.state.patience -= 25
-                self.state.interest -= 10
+                self.state.patience -= 30  # Aumentado de 25
+                self.state.interest -= 15  # Aumentado de 10
             if not is_direct:
-                self.state.trust_founder -= 15
+                self.state.trust_founder -= 20  # Aumentado de 15
                 
         elif self.archetype['id'] == 'cetico':
             if is_evasive or not is_direct:
-                self.state.interest -= 20
-                self.state.patience -= 15
+                self.state.interest -= 25  # Aumentado de 20
+                self.state.patience -= 20  # Aumentado de 15
                 
         elif self.archetype['id'] == 'visionario':
             if not answer_quality.get('has_vision', False):
-                self.state.interest -= 10
+                self.state.interest -= 15  # Aumentado de 10
         
-        # Lógica geral
+        # Lógica geral (mais agressiva)
         if is_evasive:
-            self.state.patience -= 10
+            self.state.patience -= 15  # Aumentado de 10
+        
+        # Desgaste natural a cada turno
+        self.state.patience -= 3  # Novo: paciência diminui naturalmente
             
-        # Ajustar decisão latente
-        if self.state.interest < 20 or self.state.patience < 15:
+        # Ajustar decisão latente (thresholds mais altos)
+        if self.state.interest < 30 or self.state.patience < 25:  # Aumentado de 20/15
             self.state.latent_decision = "LEANING_OUT"
-        if self.state.interest < 10 or self.state.patience < 5:
+        if self.state.interest < 15 or self.state.patience < 10:  # Aumentado de 10/5
             self.state.latent_decision = "OUT"
             
     def should_interrupt(self, turn_count: int) -> bool:
