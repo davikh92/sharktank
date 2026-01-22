@@ -212,6 +212,21 @@ const Report = () => {
             <p className="text-lg text-gray-800 font-medium">{report.veredito}</p>
           </section>
 
+          {/* 8. Momento de Virada */}
+          {report.momento_virada && report.momento_virada.houve_virada && (
+            <section data-testid="report-momento-virada">
+              <h2 className="text-2xl font-bold mb-4 border-b border-gray-300 pb-2">
+                Momento de Virada
+              </h2>
+              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                <p className="text-gray-800">
+                  <strong>Turno crítico: {report.momento_virada.turno_critico}</strong>
+                </p>
+                <p className="text-gray-700 mt-2">{report.momento_virada.descricao}</p>
+              </div>
+            </section>
+          )}
+
           {/* Footer */}
           <div className="text-center pt-8 border-t border-gray-300">
             <p className="text-sm text-gray-500">
