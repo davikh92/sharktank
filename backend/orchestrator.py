@@ -387,7 +387,12 @@ class Orchestrator:
         for shark_data in sharks_data:
             archetype = get_archetype_by_id(shark_data['archetype_id'])
             if archetype:
-                agent = SharkAgent(shark_data['shark_id'], archetype, session_context)
+                # Carregar estado existente se houver
+                initial_state = None
+                if 'state' in shark_data:
+                    initial_state = SharkState(**shark_data['state'])
+                
+                agent = SharkAgent(shark_data['shark_id'], archetype, session_context, initial_state)
                 self.sharks.append(agent)
     
     def analyze_answer_quality(self, answer: str) -> Dict[str, Any]:
