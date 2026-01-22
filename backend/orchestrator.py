@@ -280,11 +280,14 @@ class SharkAgent:
         return random.random() < 0.15
         
     def should_go_out(self, turn_count: int) -> bool:
-        """Decide se o shark deve sair (com multiplicador progressivo)"""
+        """
+        Decide se o shark deve sair
+        Sistema nunca reage ao último turno - reage à história
+        """
         if self.state.is_out:
             return False
         
-        # Primeiros 3-4 turnos: proteção - saída é rara
+        # Primeiros 4 turnos: proteção - observam antes de julgar
         if turn_count <= 4:
             if self.state.latent_decision == "OUT":
                 return random.random() < 0.15  # Apenas 15% mesmo com decisão OUT
@@ -294,38 +297,48 @@ class SharkAgent:
         if self.state.latent_decision == "OUT":
             return True
         
-        # Decisão LEANING_OUT: probabilidade base
-        base_probability = 0.40
+        # Calcular saúde composta
+        health = self._calculate_health()
         
-        # A partir do turno 10: multiplicador progressivo baseado no estado
+        # Probabilidade base baseada em saúde
+        if health < 20:
+            base_prob = 0.70
+        elif health < 35:
+            base_prob = 0.50
+        elif health < 50:
+            base_prob = 0.30
+        else:
+            base_prob = 0.15
+        
+        # Pattern score influencia
+        pattern_score = self.response_memory.get_pattern_score()
+        pattern_penalty = 1.0
+        
+        if pattern_score < -2.0:
+            pattern_penalty = 1.5  # Padrão ruim aumenta chance
+        elif pattern_score > 2.0:
+            pattern_penalty = 0.6  # Padrão bom protege
+        
+        base_prob *= pattern_penalty
+        
+        # A partir do turno 10: multiplicador progressivo (remove amortecedor)
         if turn_count >= 10:
-            # Calcular "saúde" do shark (0-100)
-            health_score = (self.state.interest + self.state.patience) / 2
+            time_multiplier = 1.0
             
-            # Multiplicador: quanto pior o estado, maior a chance
-            if health_score < 20:
-                multiplier = 3.0  # Saúde crítica
-            elif health_score < 35:
-                multiplier = 2.0  # Saúde baixa
-            elif health_score < 50:
-                multiplier = 1.5  # Saúde média-baixa
-            else:
-                multiplier = 1.0  # Saúde OK
-            
-            # Aumenta multiplicador progressivamente após turno 15
             if turn_count >= 15:
-                multiplier *= 1.3
+                time_multiplier = 1.3
             if turn_count >= 18:
-                multiplier *= 1.5
+                time_multiplier = 1.6
             
-            base_probability *= multiplier
+            base_prob *= time_multiplier
         
+        # LEANING_OUT usa probabilidade calculada
         if self.state.latent_decision == "LEANING_OUT":
-            return random.random() < base_probability
+            return random.random() < base_prob
         
-        # Chance mínima se estado muito ruim
-        if self.state.interest < 20 or self.state.patience < 15:
-            return random.random() < 0.25
+        # Chance mínima se saúde crítica
+        if health < 30:
+            return random.random() < (base_prob * 0.5)
         
         return False
 
