@@ -221,24 +221,7 @@ class Orchestrator:
         # 6. Escolher shark para responder
         responding_shark = random.choice(active_sharks)
         
-        # 7. Forçar saídas progressivas (dificuldade real)
-        # Após turno 10: pelo menos 1 shark deve ter saído
-        # Após turno 15: pelo menos 2 sharks devem ter saído
-        sharks_out_count = len([s for s in self.sharks if s.state.is_out])
-        
-        if self.turn_count >= 15 and sharks_out_count < 2:
-            # Forçar saída do shark com menor interesse
-            sharks_by_interest = sorted(active_sharks, key=lambda s: s.state.interest)
-            forced_out_shark = sharks_by_interest[0]
-            forced_out_shark.state.latent_decision = "OUT"
-            
-        elif self.turn_count >= 10 and sharks_out_count < 1:
-            # Forçar saída do shark com menor interesse
-            sharks_by_interest = sorted(active_sharks, key=lambda s: s.state.interest)
-            forced_out_shark = sharks_by_interest[0]
-            forced_out_shark.state.latent_decision = "OUT"
-        
-        # 8. Decidir tipo de resposta
+        # 7. Decidir tipo de resposta
         # Chance de interrupção
         if responding_shark.should_interrupt(self.turn_count) and self.turn_count > 2:
             interrupt_msg, interrupt_event = await self._generate_interruption(responding_shark)
