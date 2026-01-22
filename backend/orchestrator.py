@@ -1,0 +1,377 @@
+import random
+from typing import List, Dict, Any, Optional
+from datetime import datetime, timezone
+import uuid
+from models import (
+    EventType, MessageType, SessionStatus, SharkState,
+    MessageResponse, EventResponse, OrchestratorResponse
+)
+from shark_archetypes import get_archetype_by_id
+import os
+from dotenv import load_dotenv
+from emergentintegrations.llm.chat import LlmChat, UserMessage
+import asyncio
+
+load_dotenv()
+
+EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY')
+
+class SharkAgent:
+    def __init__(self, shark_id: str, archetype_data: Dict[str, Any], session_context: str):
+        self.shark_id = shark_id
+        self.archetype = archetype_data
+        self.state = SharkState()
+        self.session_context = session_context
+        self.conversation_memory: List[str] = []
+        
+    def update_state_from_answer(self, answer: str, answer_quality: Dict[str, Any]):
+        """Atualiza o estado interno do shark baseado na resposta do usuário"""
+        # Análise de qualidade da resposta
+        is_evasive = answer_quality.get('is_evasive', False)
+        has_numbers = answer_quality.get('has_numbers', False)
+        is_direct = answer_quality.get('is_direct', True)
+        
+        # Lógica específica por arquétipo
+        if self.archetype['id'] == 'financeiro':
+            if not has_numbers:
+                self.state.interest -= 15
+                self.state.trust_founder -= 10
+            if is_evasive:
+                self.state.patience -= 20
+                
+        elif self.archetype['id'] == 'operador':
+            if is_evasive:
+                self.state.patience -= 25
+                self.state.interest -= 10
+            if not is_direct:
+                self.state.trust_founder -= 15
+                
+        elif self.archetype['id'] == 'cetico':
+            if is_evasive or not is_direct:
+                self.state.interest -= 20
+                self.state.patience -= 15
+                
+        elif self.archetype['id'] == 'visionario':
+            if not answer_quality.get('has_vision', False):
+                self.state.interest -= 10
+        
+        # Lógica geral
+        if is_evasive:
+            self.state.patience -= 10
+            
+        # Ajustar decisão latente
+        if self.state.interest < 20 or self.state.patience < 15:
+            self.state.latent_decision = "LEANING_OUT"
+        if self.state.interest < 10 or self.state.patience < 5:
+            self.state.latent_decision = "OUT"
+            
+    def should_interrupt(self, turn_count: int) -> bool:
+        """Decide se o shark deve interromper"""
+        if self.state.is_out:
+            return False
+            
+        # Cético interrompe mais
+        if self.archetype['id'] == 'cetico':
+            return random.random() < 0.25
+        # Operador interrompe se perder paciência
+        elif self.archetype['id'] == 'operador' and self.state.patience < 60:
+            return random.random() < 0.20
+            
+        return random.random() < 0.10
+        
+    def should_go_silent(self) -> bool:
+        """Decide se o shark fica em silêncio"""
+        if self.state.is_out:
+            return True
+        if self.state.interest < 30:
+            return random.random() < 0.30
+        return random.random() < 0.15
+        
+    def should_go_out(self) -> bool:
+        """Decide se o shark deve sair"""
+        if self.state.is_out:
+            return False
+        if self.state.latent_decision == "OUT":
+            return True
+        if self.state.latent_decision == "LEANING_OUT" and random.random() < 0.40:
+            return True
+        return False
+
+    async def generate_speech(self, intent: str, context: str) -> str:
+        """Gera a fala do shark usando LLM"""
+        try:
+            chat = LlmChat(
+                api_key=EMERGENT_LLM_KEY,
+                session_id=f"shark_{self.shark_id}_{uuid.uuid4().hex[:8]}",
+                system_message=self.archetype['personalidade_prompt']
+            ).with_model("openai", "gpt-5.2")
+            
+            prompt = f"""{context}
+
+Intenção: {intent}
+
+Gere uma fala CURTA (máximo 2-3 frases) como {self.archetype['name']}. 
+Seja direto, sem rodeios. Use o estilo: {self.archetype['estilo']}.
+Não seja prolixo. Seja incisivo."""
+            
+            user_message = UserMessage(text=prompt)
+            response = await chat.send_message(user_message)
+            
+            return response.strip()
+        except Exception as e:
+            print(f"Erro ao gerar fala do shark: {e}")
+            # Fallback
+            return random.choice(self.archetype['perguntas_tipicas'])
+
+class Orchestrator:
+    def __init__(self, db, session_id: str, pitch_data: Dict[str, Any], sharks_data: List[Dict[str, Any]]):
+        self.db = db
+        self.session_id = session_id
+        self.pitch_data = pitch_data
+        self.turn_count = 0
+        self.phase = "exploration"  # exploration, tension, closing
+        
+        # Criar agentes dos sharks
+        self.sharks: List[SharkAgent] = []
+        session_context = f"Pitch: {pitch_data.get('titulo', '')}. Problema: {pitch_data.get('problema', '')}. Solução: {pitch_data.get('solucao', '')}."
+        
+        for shark_data in sharks_data:
+            archetype = get_archetype_by_id(shark_data['archetype_id'])
+            if archetype:
+                agent = SharkAgent(shark_data['shark_id'], archetype, session_context)
+                self.sharks.append(agent)
+    
+    def analyze_answer_quality(self, answer: str) -> Dict[str, Any]:
+        """Análise simples da qualidade da resposta"""
+        words = answer.split()
+        
+        # Detecta evasividade (respostas muito longas ou muito curtas)
+        is_evasive = len(words) > 100 or len(words) < 5
+        
+        # Detecta números
+        has_numbers = any(char.isdigit() for char in answer)
+        
+        # Resposta direta (entre 10-60 palavras)
+        is_direct = 10 <= len(words) <= 60
+        
+        # Visão (palavras relacionadas a futuro/escala)
+        vision_words = ['futuro', 'escala', 'crescimento', 'bilhão', 'milhão', 'global', 'mundial', 'expansão']
+        has_vision = any(word in answer.lower() for word in vision_words)
+        
+        return {
+            'is_evasive': is_evasive,
+            'has_numbers': has_numbers,
+            'is_direct': is_direct,
+            'has_vision': has_vision,
+            'word_count': len(words)
+        }
+    
+    async def process_user_answer(self, answer: str) -> OrchestratorResponse:
+        """Processa a resposta do usuário e decide o próximo evento"""
+        self.turn_count += 1
+        
+        messages: List[MessageResponse] = []
+        events: List[EventResponse] = []
+        
+        # 1. Salvar resposta do usuário
+        user_message = await self._save_message("USER", answer, MessageType.ANSWER)
+        messages.append(user_message)
+        
+        # 2. Criar evento ANSWER_RECEIVED
+        answer_event = await self._save_event(EventType.ANSWER_RECEIVED, "USER", {"content": answer})
+        events.append(answer_event)
+        
+        # 3. Analisar qualidade da resposta
+        answer_quality = self.analyze_answer_quality(answer)
+        
+        if answer_quality['is_evasive']:
+            evasive_event = await self._save_event(EventType.ANSWER_EVASIVE, "USER", answer_quality)
+            events.append(evasive_event)
+        
+        # 4. Atualizar estado de todos os sharks
+        for shark in self.sharks:
+            if not shark.state.is_out:
+                shark.update_state_from_answer(answer, answer_quality)
+        
+        # 5. Decidir próximo evento
+        active_sharks = [s for s in self.sharks if not s.state.is_out]
+        
+        if not active_sharks:
+            # Todos saíram - encerrar sessão
+            return await self._end_session(messages, events)
+        
+        # 6. Escolher shark para responder
+        responding_shark = random.choice(active_sharks)
+        
+        # 7. Decidir tipo de resposta
+        # Chance de interrupção
+        if responding_shark.should_interrupt(self.turn_count) and self.turn_count > 2:
+            interrupt_msg, interrupt_event = await self._generate_interruption(responding_shark)
+            messages.append(interrupt_msg)
+            events.append(interrupt_event)
+        
+        # Chance de shark sair
+        if responding_shark.should_go_out():
+            out_msg, out_event = await self._generate_out(responding_shark)
+            messages.append(out_msg)
+            events.append(out_event)
+            
+            # Verificar se ainda há sharks ativos
+            active_sharks = [s for s in self.sharks if not s.state.is_out]
+            if not active_sharks:
+                return await self._end_session(messages, events)
+            
+            # Próximo shark responde
+            responding_shark = random.choice(active_sharks)
+        
+        # Chance de silêncio de outro shark
+        if random.random() < 0.20:
+            silent_shark = random.choice([s for s in active_sharks if s.shark_id != responding_shark.shark_id])
+            if silent_shark and silent_shark.should_go_silent():
+                silent_event = await self._save_event(
+                    EventType.SHARK_SILENT,
+                    silent_shark.archetype['name'],
+                    {"reason": "Perda de interesse ou reflexão"}
+                )
+                events.append(silent_event)
+                silent_shark.state.silent_turns += 1
+        
+        # 8. Gerar próxima pergunta
+        question_msg, question_event = await self._generate_question(responding_shark, answer)
+        messages.append(question_msg)
+        events.append(question_event)
+        
+        # 9. Atualizar fase se necessário
+        if self.turn_count > 8:
+            self.phase = "tension"
+        if self.turn_count > 15:
+            self.phase = "closing"
+        
+        # 10. Reading hint (se habilitado)
+        reading_hint = None
+        if self.turn_count % 3 == 0:  # A cada 3 turnos
+            reading_hint = self._generate_reading_hint()
+        
+        return OrchestratorResponse(
+            messages=messages,
+            events=events,
+            session_status=SessionStatus.IN_PROGRESS,
+            can_user_respond=True,
+            reading_hint=reading_hint
+        )
+    
+    async def _generate_question(self, shark: SharkAgent, previous_answer: str) -> tuple:
+        """Gera uma pergunta do shark"""
+        context = f"O usuário respondeu: '{previous_answer}'. Faça uma pergunta relevante e incisiva sobre o pitch."
+        
+        speech = await shark.generate_speech("QUESTION", context)
+        
+        message = await self._save_message(shark.archetype['name'], speech, MessageType.QUESTION)
+        event = await self._save_event(EventType.QUESTION_ASKED, shark.archetype['name'], {"question": speech})
+        
+        return message, event
+    
+    async def _generate_interruption(self, shark: SharkAgent) -> tuple:
+        """Gera uma interrupção do shark"""
+        context = "Você está interrompendo o empreendedor porque não está satisfeito com a direção da conversa."
+        
+        speech = await shark.generate_speech("INTERRUPT", context)
+        
+        message = await self._save_message(shark.archetype['name'], speech, MessageType.INTERRUPTION)
+        event = await self._save_event(EventType.PITCH_INTERRUPTED, shark.archetype['name'], {"reason": "Insatisfação"})
+        
+        return message, event
+    
+    async def _generate_out(self, shark: SharkAgent) -> tuple:
+        """Gera a saída de um shark"""
+        shark.state.is_out = True
+        
+        context = "Você está saindo do investimento. Seja direto e explique brevemente por quê."
+        speech = await shark.generate_speech("OUT", context)
+        
+        message = await self._save_message(shark.archetype['name'], speech, MessageType.OUT_ANNOUNCEMENT)
+        event = await self._save_event(EventType.SHARK_OUT, shark.archetype['name'], {
+            "reason": "Perda de interesse",
+            "final_interest": shark.state.interest,
+            "final_patience": shark.state.patience
+        })
+        
+        # Atualizar no banco
+        await self.db.session_sharks.update_one(
+            {"session_id": self.session_id, "archetype_name": shark.archetype['name']},
+            {"$set": {"state": shark.state.model_dump(), "is_out": True}}
+        )
+        
+        return message, event
+    
+    async def _end_session(self, messages: List[MessageResponse], events: List[EventResponse]) -> OrchestratorResponse:
+        """Encerra a sessão"""
+        end_event = await self._save_event(EventType.SESSION_ENDED, "SYSTEM", {"turn_count": self.turn_count})
+        events.append(end_event)
+        
+        # Atualizar status da sessão
+        await self.db.sessions.update_one(
+            {"id": self.session_id},
+            {"$set": {"status": SessionStatus.COMPLETED}}
+        )
+        
+        return OrchestratorResponse(
+            messages=messages,
+            events=events,
+            session_status=SessionStatus.COMPLETED,
+            can_user_respond=False,
+            reading_hint=None
+        )
+    
+    def _generate_reading_hint(self) -> Optional[str]:
+        """Gera dica de leitura de mesa"""
+        active_sharks = [s for s in self.sharks if not s.state.is_out]
+        if not active_sharks:
+            return None
+            
+        shark = random.choice(active_sharks)
+        
+        if shark.state.interest < 30:
+            return f"{shark.archetype['name']} parece entediado."
+        elif shark.state.patience < 40:
+            return f"{shark.archetype['name']} demonstra impaciência."
+        elif shark.state.interest > 70:
+            return f"{shark.archetype['name']} está mais atento."
+        
+        return None
+    
+    async def _save_message(self, speaker: str, content: str, message_type: MessageType) -> MessageResponse:
+        """Salva uma mensagem no banco"""
+        message_id = str(uuid.uuid4())
+        timestamp = datetime.now(timezone.utc).isoformat()
+        
+        message_doc = {
+            "id": message_id,
+            "session_id": self.session_id,
+            "speaker": speaker,
+            "content": content,
+            "message_type": message_type,
+            "timestamp": timestamp
+        }
+        
+        await self.db.messages.insert_one(message_doc)
+        
+        return MessageResponse(**message_doc)
+    
+    async def _save_event(self, event_type: EventType, actor: str, data: Dict[str, Any]) -> EventResponse:
+        """Salva um evento no banco"""
+        event_id = str(uuid.uuid4())
+        timestamp = datetime.now(timezone.utc).isoformat()
+        
+        event_doc = {
+            "id": event_id,
+            "session_id": self.session_id,
+            "event_type": event_type,
+            "actor": actor,
+            "timestamp": timestamp,
+            "data": data
+        }
+        
+        await self.db.events.insert_one(event_doc)
+        
+        return EventResponse(**event_doc)
