@@ -149,7 +149,7 @@ const SessionRoom = () => {
 
           {/* Sharks Panel */}
           <div className="grid grid-cols-4 gap-4" data-testid="sharks-panel">
-            {session.sharks.map((shark, idx) => {
+            {session.sharks && session.sharks.map((shark, idx) => {
               const isOut = shark.state?.is_out || false;
               return (
                 <div
