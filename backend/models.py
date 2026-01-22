@@ -74,6 +74,8 @@ class SharkState(BaseModel):
     latent_decision: str = "ACTIVE"  # ACTIVE, LEANING_OUT, OUT
     is_out: bool = False
     silent_turns: int = 0
+    confianca: float = 50.0  # Confiança implícita
+    fadiga: float = 0.0      # Fadiga temporal
 
 class SessionSharkResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
