@@ -480,7 +480,20 @@ class Orchestrator:
         if not active_sharks:
             return await self._end_session(messages, events)
         
-        # 6. Escolher shark para responder
+        # 6. VERIFICAR SAÍDAS AUTOMÁTICAS (decisão OUT é mandatória)
+        for shark in active_sharks[:]:  # Copiar lista para modificar durante iteração
+            if shark.should_go_out(self.turn_count):
+                out_msg, out_event = await self._generate_out(shark)
+                messages.append(out_msg)
+                events.append(out_event)
+        
+        # Atualizar lista de sharks ativos
+        active_sharks = [s for s in self.sharks if not s.state.is_out]
+        
+        if not active_sharks:
+            return await self._end_session(messages, events)
+        
+        # 7. Escolher shark para responder
         responding_shark = random.choice(active_sharks)
         
         # 7. OFERTAS - Sharks com interesse muito alto fazem oferta (após turno 10)
