@@ -470,7 +470,16 @@ class Orchestrator:
         # 6. Escolher shark para responder
         responding_shark = random.choice(active_sharks)
         
-        # 7. Decidir tipo de resposta
+        # 7. OFERTAS - Sharks com interesse muito alto fazem oferta (após turno 10)
+        if self.turn_count >= 10:
+            sharks_interessados = [s for s in active_sharks if s.state.interest > 70 and s.confianca > 60]
+            if sharks_interessados and random.random() < 0.25:  # 25% de chance
+                offering_shark = sharks_interessados[0]
+                offer_msg, offer_event = await self._generate_offer(offering_shark)
+                messages.append(offer_msg)
+                events.append(offer_event)
+        
+        # 8. Decidir tipo de resposta
         # Chance de interrupção
         if responding_shark.should_interrupt(self.turn_count) and self.turn_count > 2:
             interrupt_msg, interrupt_event = await self._generate_interruption(responding_shark)
@@ -492,18 +501,20 @@ class Orchestrator:
             responding_shark = random.choice(active_sharks)
         
         # Chance de silêncio de outro shark
-        if random.random() < 0.20:
-            silent_shark = random.choice([s for s in active_sharks if s.shark_id != responding_shark.shark_id])
-            if silent_shark and silent_shark.should_go_silent():
-                silent_event = await self._save_event(
-                    EventType.SHARK_SILENT,
-                    silent_shark.archetype['name'],
-                    {"reason": "Perda de interesse ou reflexão"}
-                )
-                events.append(silent_event)
-                silent_shark.state.silent_turns += 1
+        if random.random() < 0.15:  # Reduzido de 0.20
+            other_sharks = [s for s in active_sharks if s.shark_id != responding_shark.shark_id]
+            if other_sharks:
+                silent_shark = random.choice(other_sharks)
+                if silent_shark.should_go_silent():
+                    silent_event = await self._save_event(
+                        EventType.SHARK_SILENT,
+                        silent_shark.archetype['name'],
+                        {"reason": "Desinteresse"}
+                    )
+                    events.append(silent_event)
+                    silent_shark.state.silent_turns += 1
         
-        # 8. Gerar próxima pergunta
+        # 9. Gerar próxima pergunta (com contexto do histórico)
         question_msg, question_event = await self._generate_question(responding_shark, answer)
         messages.append(question_msg)
         events.append(question_event)
