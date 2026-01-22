@@ -433,10 +433,10 @@ class Orchestrator:
             evasive_event = await self._save_event(EventType.ANSWER_EVASIVE, "USER", answer_quality)
             events.append(evasive_event)
         
-        # 4. Atualizar estado de todos os sharks
+        # 4. Atualizar estado de todos os sharks (MODELO HÍBRIDO)
         for shark in self.sharks:
             if not shark.state.is_out:
-                shark.update_state_from_answer(answer, answer_quality)
+                shark.update_state_from_answer(answer, answer_quality, self.turn_count)
         
         # 5. Decidir próximo evento
         active_sharks = [s for s in self.sharks if not s.state.is_out]
