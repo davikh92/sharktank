@@ -387,8 +387,9 @@ class Orchestrator:
                 self.sharks.append(agent)
     
     def analyze_answer_quality(self, answer: str) -> Dict[str, Any]:
-        """Análise simples da qualidade da resposta"""
+        """Análise aprimorada da qualidade da resposta"""
         words = answer.split()
+        answer_lower = answer.lower()
         
         # Detecta evasividade (respostas muito longas ou muito curtas)
         is_evasive = len(words) > 100 or len(words) < 5
@@ -401,13 +402,23 @@ class Orchestrator:
         
         # Visão (palavras relacionadas a futuro/escala)
         vision_words = ['futuro', 'escala', 'crescimento', 'bilhão', 'milhão', 'global', 'mundial', 'expansão']
-        has_vision = any(word in answer.lower() for word in vision_words)
+        has_vision = any(word in answer_lower for word in vision_words)
+        
+        # Diferenciação (palavras que indicam diferencial)
+        diff_words = ['único', 'exclusivo', 'diferente', 'inovador', 'pioneiro', 'patenteado', 'proprietário']
+        has_differentiation = any(word in answer_lower for word in diff_words)
+        
+        # Genericidade (buzzwords vazios)
+        generic_words = ['disruptivo', 'revolucionário', 'transformador', 'game changer']
+        is_generic = any(word in answer_lower for word in generic_words) and not has_differentiation
         
         return {
             'is_evasive': is_evasive,
             'has_numbers': has_numbers,
             'is_direct': is_direct,
             'has_vision': has_vision,
+            'has_differentiation': has_differentiation,
+            'is_generic': is_generic,
             'word_count': len(words)
         }
     
