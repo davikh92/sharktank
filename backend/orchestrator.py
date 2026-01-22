@@ -539,13 +539,44 @@ class Orchestrator:
         )
     
     async def _generate_question(self, shark: SharkAgent, previous_answer: str) -> tuple:
-        """Gera uma pergunta do shark"""
-        context = f"O usuário respondeu: '{previous_answer}'. Faça uma pergunta relevante e incisiva sobre o pitch."
+        """Gera uma pergunta do shark usando histórico completo"""
+        # Construir contexto com últimas 3-4 interações
+        recent_context = "\n".join(shark.conversation_memory[-4:]) if len(shark.conversation_memory) > 0 else ""
+        
+        context = f"""Histórico recente da conversa:
+{recent_context}
+
+Última resposta do empreendedor: '{previous_answer}'
+
+Faça uma pergunta incisiva e direta relacionada ao pitch OU ao histórico da conversa.
+Seja brutal. Não seja educado demais."""
         
         speech = await shark.generate_speech("QUESTION", context)
         
         message = await self._save_message(shark.archetype['name'], speech, MessageType.QUESTION)
         event = await self._save_event(EventType.QUESTION_ASKED, shark.archetype['name'], {"question": speech})
+        
+        return message, event
+    
+    async def _generate_offer(self, shark: SharkAgent) -> tuple:
+        """Gera uma oferta do shark"""
+        context = f"""Você está MUITO interessado neste negócio.
+Faça uma oferta concreta e direta.
+Seja específico com valor e % equity que você ofereceria.
+Mantenha seu estilo: {shark.archetype['estilo']}."""
+        
+        speech = await shark.generate_speech("OFFER", context)
+        
+        message = await self._save_message(shark.archetype['name'], speech, MessageType.OFFER)
+        event = await self._save_event(
+            EventType.SHARK_OFFER,
+            shark.archetype['name'],
+            {
+                "offer": speech,
+                "interest_level": shark.state.interest,
+                "confidence_level": shark.confianca
+            }
+        )
         
         return message, event
     
