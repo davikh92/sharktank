@@ -106,15 +106,13 @@ const SessionRoom = () => {
     return shark?.state?.is_out ? 'OUT' : 'ATIVO';
   };
 
-  if (loading) {
+  if (loading || !session) {
     return (
       <div className="studio-background min-h-screen flex items-center justify-center">
         <div className="text-gray-400">Carregando sessão...</div>
       </div>
     );
   }
-
-  if (!session) return null;
 
   return (
     <div className="studio-background vignette min-h-screen" data-testid="session-room">
