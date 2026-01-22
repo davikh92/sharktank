@@ -496,7 +496,7 @@ class Orchestrator:
         # 7. Escolher shark para responder
         responding_shark = random.choice(active_sharks)
         
-        # 7. OFERTAS - Sharks com interesse muito alto fazem oferta (após turno 10)
+        # 8. OFERTAS - Sharks com interesse muito alto fazem oferta (após turno 10)
         if self.turn_count >= 10:
             sharks_interessados = [s for s in active_sharks if s.state.interest > 70 and s.confianca > 60]
             if sharks_interessados and random.random() < 0.25:  # 25% de chance
@@ -505,26 +505,12 @@ class Orchestrator:
                 messages.append(offer_msg)
                 events.append(offer_event)
         
-        # 8. Decidir tipo de resposta
+        # 9. Decidir tipo de resposta
         # Chance de interrupção
         if responding_shark.should_interrupt(self.turn_count) and self.turn_count > 2:
             interrupt_msg, interrupt_event = await self._generate_interruption(responding_shark)
             messages.append(interrupt_msg)
             events.append(interrupt_event)
-        
-        # Chance de shark sair
-        if responding_shark.should_go_out(self.turn_count):
-            out_msg, out_event = await self._generate_out(responding_shark)
-            messages.append(out_msg)
-            events.append(out_event)
-            
-            # Verificar se ainda há sharks ativos
-            active_sharks = [s for s in self.sharks if not s.state.is_out]
-            if not active_sharks:
-                return await self._end_session(messages, events)
-            
-            # Próximo shark responde
-            responding_shark = random.choice(active_sharks)
         
         # Chance de silêncio de outro shark
         if random.random() < 0.15:  # Reduzido de 0.20
