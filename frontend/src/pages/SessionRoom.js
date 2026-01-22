@@ -106,7 +106,7 @@ const SessionRoom = () => {
     return shark?.state?.is_out ? 'OUT' : 'ATIVO';
   };
 
-  if (loading || !session) {
+  if (loading || !session || !session.pitch) {
     return (
       <div className="studio-background min-h-screen flex items-center justify-center">
         <div className="text-gray-400">Carregando sessão...</div>
