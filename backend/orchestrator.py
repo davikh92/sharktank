@@ -238,9 +238,10 @@ class SharkAgent:
         """Atualiza decisão latente baseado em saúde composta"""
         health = self._calculate_health()
         
-        if health < 25:
+        # THRESHOLDS MAIS AGRESSIVOS
+        if health < 35:  # Aumentado de 25
             self.state.latent_decision = "OUT"
-        elif health < 45:
+        elif health < 55:  # Aumentado de 45
             self.state.latent_decision = "LEANING_OUT"
         else:
             self.state.latent_decision = "ACTIVE"
