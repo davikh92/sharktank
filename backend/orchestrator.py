@@ -156,17 +156,17 @@ class SharkAgent:
         # Salvar na memória de conversa
         self.conversation_memory.append(answer)
         
-        # CAMADA 1: Desgaste natural (sempre) - MAIS AGRESSIVO
-        desgaste = 5.0  # Aumentado de 3.0
+        # CAMADA 1: Desgaste natural - BALANCEADO (+15-20%)
+        desgaste = 6.0  # Era 5.0
         if self.archetype['id'] == 'operador':
-            desgaste = 7.0  # Aumentado de 4.0
+            desgaste = 8.0  # Era 7.0
         elif self.archetype['id'] == 'financeiro':
-            desgaste = 6.0  # Aumentado de 3.5
+            desgaste = 7.0  # Era 6.0
         elif self.archetype['id'] == 'cetico':
-            desgaste = 6.5  # Novo
+            desgaste = 7.5  # Era 6.5
         
         self.state.patience -= desgaste
-        self.fadiga += (turn_count * 1.0)  # Aumentado de 0.5
+        self.fadiga += (turn_count * 1.2)  # Era 1.0
         
         # CAMADA 2: Memória ponderada
         self.response_memory.decay_weights()
