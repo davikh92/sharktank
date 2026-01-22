@@ -63,49 +63,174 @@ class SharkAgent:
         # Nova camada: fadiga temporal (0-100)
         self.fadiga = 0.0
         
-    def update_state_from_answer(self, answer: str, answer_quality: Dict[str, Any]):
-        """Atualiza o estado interno do shark baseado na resposta do usuário"""
-        # Análise de qualidade da resposta
-        is_evasive = answer_quality.get('is_evasive', False)
-        has_numbers = answer_quality.get('has_numbers', False)
-        is_direct = answer_quality.get('is_direct', True)
+    def _evaluate_response_quality(self, answer: str, answer_analysis: Dict[str, Any]) -> int:
+        """
+        Avalia qualidade do conteúdo (não forma)
+        Retorna: -1 (fraco), 0 (neutro), +1 (bom)
+        """
+        score = 0
         
-        # Lógica específica por arquétipo (mais agressiva)
+        # Análise por arquétipo
         if self.archetype['id'] == 'financeiro':
-            if not has_numbers:
-                self.state.interest -= 20  # Aumentado de 15
-                self.state.trust_founder -= 15  # Aumentado de 10
-            if is_evasive:
-                self.state.patience -= 30  # Aumentado de 20
+            if answer_analysis.get('has_numbers'):
+                score += 1
+            if answer_analysis.get('is_evasive'):
+                score -= 1
                 
         elif self.archetype['id'] == 'operador':
-            if is_evasive:
-                self.state.patience -= 30  # Aumentado de 25
-                self.state.interest -= 15  # Aumentado de 10
-            if not is_direct:
-                self.state.trust_founder -= 20  # Aumentado de 15
+            if answer_analysis.get('is_direct'):
+                score += 1
+            if answer_analysis.get('is_evasive'):
+                score -= 1
                 
         elif self.archetype['id'] == 'cetico':
-            if is_evasive or not is_direct:
-                self.state.interest -= 25  # Aumentado de 20
-                self.state.patience -= 20  # Aumentado de 15
+            if answer_analysis.get('has_differentiation', False):
+                score += 1
+            if answer_analysis.get('is_generic', True):
+                score -= 1
                 
         elif self.archetype['id'] == 'visionario':
-            if not answer_quality.get('has_vision', False):
-                self.state.interest -= 15  # Aumentado de 10
+            if answer_analysis.get('has_vision'):
+                score += 1
         
-        # Lógica geral (mais agressiva)
-        if is_evasive:
-            self.state.patience -= 15  # Aumentado de 10
+        # Normalizar para -1, 0, +1
+        if score >= 1:
+            return 1
+        elif score <= -1:
+            return -1
+        return 0
+    
+    def _detect_contradiction(self, current_answer: str) -> bool:
+        """Detecta contradições com respostas anteriores"""
+        # Simplificado: em produção usaria embedding similarity
+        if len(self.conversation_memory) < 2:
+            return False
         
-        # Desgaste natural a cada turno
-        self.state.patience -= 3  # Novo: paciência diminui naturalmente
-            
-        # Ajustar decisão latente (thresholds mais altos)
-        if self.state.interest < 30 or self.state.patience < 25:  # Aumentado de 20/15
-            self.state.latent_decision = "LEANING_OUT"
-        if self.state.interest < 15 or self.state.patience < 10:  # Aumentado de 10/5
-            self.state.latent_decision = "OUT"
+        # Heurística simples: palavras conflitantes
+        conflict_pairs = [
+            (['sim', 'temos'], ['não', 'ainda']),
+            (['já', 'implementado'], ['vamos', 'pretendemos']),
+        ]
+        
+        current_lower = current_answer.lower()
+        for prev in self.conversation_memory[-3:]:
+            prev_lower = prev.lower()
+            for positive, negative in conflict_pairs:
+                has_positive_prev = any(word in prev_lower for word in positive)
+                has_negative_current = any(word in current_lower for word in negative)
+                if has_positive_prev and has_negative_current:
+                    return True
+        
+        return False
+    
+    def _detect_critical_event(self, answer: str, answer_analysis: Dict[str, Any]) -> Optional[str]:
+        """
+        Detecta eventos críticos que mudam trajetória
+        Retorna tipo do evento ou None
+        """
+        # Pedido claro e bem defendido
+        if 'pedido' in answer.lower() and answer_analysis.get('has_numbers'):
+            return 'PEDIDO_FORTE'
+        
+        # Insight único ou diferenciado
+        keywords_insight = ['inovação', 'único', 'exclusivo', 'patenteado', 'propriedade']
+        if any(kw in answer.lower() for kw in keywords_insight):
+            return 'INSIGHT_UNICO'
+        
+        # Contradição grave
+        if self._detect_contradiction(answer):
+            return 'CONTRADICAO_GRAVE'
+        
+        # Clareza excepcional
+        if (answer_analysis.get('is_direct') and 
+            answer_analysis.get('has_numbers') and 
+            not answer_analysis.get('is_evasive')):
+            return 'PITCH_CLEAR'
+        
+        return None
+    
+    def update_state_from_answer(self, answer: str, answer_analysis: Dict[str, Any], turn_count: int):
+        """
+        Atualiza estado usando modelo híbrido
+        Não reage ao último turno - reage à história que está se formando
+        """
+        # Salvar na memória de conversa
+        self.conversation_memory.append(answer)
+        
+        # CAMADA 1: Desgaste natural (sempre)
+        desgaste = 3.0
+        if self.archetype['id'] == 'operador':
+            desgaste = 4.0  # Menos paciente
+        elif self.archetype['id'] == 'financeiro':
+            desgaste = 3.5
+        
+        self.state.patience -= desgaste
+        self.fadiga += (turn_count * 0.5)  # Fadiga cresce com tempo
+        
+        # CAMADA 2: Memória ponderada
+        self.response_memory.decay_weights()  # Decai histórico
+        
+        quality = self._evaluate_response_quality(answer, answer_analysis)
+        self.response_memory.add_response(quality, answer_analysis)
+        
+        pattern_score = self.response_memory.get_pattern_score()
+        recent_trend = self.response_memory.get_recent_trend(3)
+        
+        # CAMADA 3: Confiança implícita
+        # Confiança aumenta com coerência, cai com contradição
+        if quality == 1:
+            self.confianca += 3.0
+        elif quality == -1:
+            self.confianca -= 5.0
+        
+        # Contradições impactam muito
+        if self._detect_contradiction(answer):
+            self.confianca -= 15.0
+        
+        # Padrão consistente constrói confiança
+        if pattern_score > 2.0:
+            self.confianca += 2.0
+        elif pattern_score < -2.0:
+            self.confianca -= 3.0
+        
+        # CAMADA 4: Eventos críticos (não aditivos)
+        critical_event = self._detect_critical_event(answer, answer_analysis)
+        
+        if critical_event == 'PEDIDO_FORTE':
+            self.state.interest += 15
+            self.confianca += 20
+        elif critical_event == 'INSIGHT_UNICO':
+            self.state.interest += 10
+            self.confianca += 10
+        elif critical_event == 'CONTRADICAO_GRAVE':
+            self.confianca -= 40
+            self.state.patience -= 25
+        elif critical_event == 'PITCH_CLEAR':
+            self.state.interest += 8
+            self.confianca += 12
+        
+        # CAMADA 5: Impacto modulado pela confiança
+        # Alta confiança perdoa forma ruim, baixa amplifica erros
+        confidence_multiplier = 1 - (self.confianca / 120.0)  # 0.0 a 0.83
+        
+        # Penalidades moduladas
+        if answer_analysis.get('is_evasive'):
+            penalty = 15 * (1 + confidence_multiplier)
+            self.state.patience -= penalty
+        
+        # Tendência recente negativa é preocupante
+        if recent_trend < -0.5:
+            self.state.interest -= (10 * (1 + confidence_multiplier))
+        elif recent_trend > 0.5:
+            self.state.interest += (5 * (1 - confidence_multiplier))
+        
+        # Limites
+        self.state.interest = max(0, min(100, self.state.interest))
+        self.state.patience = max(0, min(100, self.state.patience))
+        self.confianca = max(0, min(100, self.confianca))
+        
+        # Ajustar decisão latente baseado em saúde composta
+        self._update_latent_decision()
             
     def should_interrupt(self, turn_count: int) -> bool:
         """Decide se o shark deve interromper"""
