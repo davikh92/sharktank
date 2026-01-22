@@ -232,6 +232,30 @@ class SharkAgent:
         # Ajustar decisão latente baseado em saúde composta
         self._update_latent_decision()
             
+    def _update_latent_decision(self):
+        """Atualiza decisão latente baseado em saúde composta"""
+        health = self._calculate_health()
+        
+        if health < 25:
+            self.state.latent_decision = "OUT"
+        elif health < 45:
+            self.state.latent_decision = "LEANING_OUT"
+        else:
+            self.state.latent_decision = "ACTIVE"
+    
+    def _calculate_health(self) -> float:
+        """
+        Calcula saúde composta do shark
+        Não é só pontos - é interesse + paciência + confiança - fadiga
+        """
+        health = (
+            self.state.interest * 0.4 +
+            self.state.patience * 0.3 +
+            self.confianca * 0.3
+        ) - (self.fadiga * 0.2)
+        
+        return max(0, min(100, health))
+    
     def should_interrupt(self, turn_count: int) -> bool:
         """Decide se o shark deve interromper"""
         if self.state.is_out:
