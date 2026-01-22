@@ -37,6 +37,9 @@ class ReportGenerator:
         # 7. Veredito
         veredito = self._generate_veredito(sharks)
         
+        # 8. Momento de virada (quando a mesa virou)
+        momento_virada = self._identify_turning_point(events, sharks)
+        
         # Salvar relatório
         report_id = str(uuid.uuid4())
         generated_at = datetime.now(timezone.utc).isoformat()
@@ -51,6 +54,7 @@ class ReportGenerator:
             "padroes_apresentador": padroes,
             "pontos_sustentacao": pontos_sustentacao,
             "veredito": veredito,
+            "momento_virada": momento_virada,
             "generated_at": generated_at
         }
         
