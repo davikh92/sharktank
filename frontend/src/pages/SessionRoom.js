@@ -186,6 +186,7 @@ const SessionRoom = () => {
                 const isUser = msg.speaker === 'USER';
                 const isInterruption = msg.message_type === 'INTERRUPTION';
                 const isOut = msg.message_type === 'OUT_ANNOUNCEMENT';
+                const isOffer = msg.message_type === 'OFFER';
                 
                 return (
                   <div
@@ -199,6 +200,7 @@ const SessionRoom = () => {
                           {isUser ? 'Você' : msg.speaker}
                           {isInterruption && <span className="ml-2 text-red-400">[INTERRUPÇÃO]</span>}
                           {isOut && <span className="ml-2 text-red-400">[OUT]</span>}
+                          {isOffer && <span className="ml-2 text-green-400">[OFERTA]</span>}
                         </div>
                         <div
                           className={`inline-block px-4 py-3 rounded-lg ${
@@ -206,6 +208,8 @@ const SessionRoom = () => {
                               ? 'bg-gray-800 text-white'
                               : isOut
                               ? 'bg-red-900/30 text-red-300 border border-red-800'
+                              : isOffer
+                              ? 'bg-green-900/30 text-green-300 border border-green-800'
                               : 'bg-gray-900 text-gray-200'
                           }`}
                         >
