@@ -22,12 +22,21 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  const setAuthToken = (token) => {
+  const setAuthToken = async (token) => {
     setApiAuthToken(token);
     if (token) {
-      getMe().then((res) => setUser(res.data));
+      try {
+        const res = await getMe();
+        setUser(res.data);
+        return true;
+      } catch (error) {
+        localStorage.removeItem('auth_token');
+        setApiAuthToken(null);
+        return false;
+      }
     } else {
       setUser(null);
+      return true;
     }
   };
 
