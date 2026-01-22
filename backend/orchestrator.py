@@ -554,13 +554,32 @@ class Orchestrator:
         # Construir contexto com últimas 3-4 interações
         recent_context = "\n".join(shark.conversation_memory[-4:]) if len(shark.conversation_memory) > 0 else ""
         
-        context = f"""Histórico recente da conversa:
+        # Detectar se resposta foi evasiva/genérica
+        answer_quality = self.analyze_answer_quality(previous_answer)
+        is_generic = answer_quality.get('is_generic', False) or answer_quality.get('is_evasive', False)
+        
+        # PERGUNTAS DE CORTE para pitch genérico
+        if is_generic and self.turn_count > 4:
+            context = f"""Histórico recente:
 {recent_context}
 
-Última resposta do empreendedor: '{previous_answer}'
+A resposta foi GENÉRICA ou EVASIVA: '{previous_answer}'
 
-Faça uma pergunta incisiva e direta relacionada ao pitch OU ao histórico da conversa.
-Seja brutal. Não seja educado demais."""
+Faça uma PERGUNTA DE CORTE (binary question):
+- "Quem paga? Hoje. Agora."
+- "Quanto custa adquirir 1 cliente? Número."
+- "Qual sua margem? Porcentagem."
+
+Seja BRUTAL e DIRETO. Exija números ou fatos concretos.
+Máximo 1-2 frases curtas."""
+        else:
+            context = f"""Histórico recente da conversa:
+{recent_context}
+
+Última resposta: '{previous_answer}'
+
+Faça uma pergunta incisiva relacionada ao pitch OU ao histórico.
+Seja direto e sem rodeios. Use o estilo: {shark.archetype['estilo']}."""
         
         speech = await shark.generate_speech("QUESTION", context)
         
