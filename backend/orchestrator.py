@@ -158,18 +158,20 @@ class SharkAgent:
         # Salvar na memória de conversa
         self.conversation_memory.append(answer)
         
-        # CAMADA 1: Desgaste natural (sempre)
-        desgaste = 3.0
+        # CAMADA 1: Desgaste natural (sempre) - MAIS AGRESSIVO
+        desgaste = 5.0  # Aumentado de 3.0
         if self.archetype['id'] == 'operador':
-            desgaste = 4.0  # Menos paciente
+            desgaste = 7.0  # Aumentado de 4.0
         elif self.archetype['id'] == 'financeiro':
-            desgaste = 3.5
+            desgaste = 6.0  # Aumentado de 3.5
+        elif self.archetype['id'] == 'cetico':
+            desgaste = 6.5  # Novo
         
         self.state.patience -= desgaste
-        self.fadiga += (turn_count * 0.5)  # Fadiga cresce com tempo
+        self.fadiga += (turn_count * 1.0)  # Aumentado de 0.5
         
         # CAMADA 2: Memória ponderada
-        self.response_memory.decay_weights()  # Decai histórico
+        self.response_memory.decay_weights()
         
         quality = self._evaluate_response_quality(answer, answer_analysis)
         self.response_memory.add_response(quality, answer_analysis)
@@ -177,22 +179,21 @@ class SharkAgent:
         pattern_score = self.response_memory.get_pattern_score()
         recent_trend = self.response_memory.get_recent_trend(3)
         
-        # CAMADA 3: Confiança implícita
-        # Confiança aumenta com coerência, cai com contradição
+        # CAMADA 3: Confiança implícita - MAIS AGRESSIVA
         if quality == 1:
-            self.confianca += 3.0
+            self.confianca += 2.0  # Diminuído de 3.0
         elif quality == -1:
-            self.confianca -= 5.0
+            self.confianca -= 8.0  # Aumentado de 5.0
         
-        # Contradições impactam muito
+        # Contradições devastam
         if self._detect_contradiction(answer):
-            self.confianca -= 15.0
+            self.confianca -= 25.0  # Aumentado de 15.0
         
-        # Padrão consistente constrói confiança
+        # Padrão consistente
         if pattern_score > 2.0:
-            self.confianca += 2.0
+            self.confianca += 1.5  # Diminuído de 2.0
         elif pattern_score < -2.0:
-            self.confianca -= 3.0
+            self.confianca -= 5.0  # Aumentado de 3.0
         
         # CAMADA 4: Eventos críticos (não aditivos)
         critical_event = self._detect_critical_event(answer, answer_analysis)
