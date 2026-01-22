@@ -452,6 +452,12 @@ class Orchestrator:
         for shark in self.sharks:
             if not shark.state.is_out:
                 shark.update_state_from_answer(answer, answer_quality, self.turn_count)
+                
+                # PERSISTIR ESTADO NO BANCO
+                await self.db.session_sharks.update_one(
+                    {"session_id": self.session_id, "archetype_name": shark.archetype['name']},
+                    {"$set": {"state": shark.state.model_dump()}}
+                )
         
         # 5. Decidir próximo evento
         active_sharks = [s for s in self.sharks if not s.state.is_out]
