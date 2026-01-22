@@ -264,3 +264,45 @@ class ReportGenerator:
             return f"Todos os {len(sharks)} investidores mantiveram interesse até o final da sessão."
         else:
             return f"{sharks_active} de {len(sharks)} investidores mantiveram interesse até o final."
+    
+    def _identify_turning_point(self, events: List[Dict], sharks: List[Dict]) -> Dict[str, Any]:
+        """Identifica quando a mesa virou"""
+        # Encontrar primeira saída
+        first_out_event = next((e for e in events if e.get('event_type') == EventType.SHARK_OUT), None)
+        
+        # Encontrar primeiro evento de resposta evasiva
+        first_evasive = next((e for e in events if e.get('event_type') == EventType.ANSWER_EVASIVE), None)
+        
+        # Contar interrupções antes da primeira saída
+        interruptions_before_out = 0
+        if first_out_event:
+            first_out_time = first_out_event.get('timestamp', '')
+            interruptions_before_out = len([
+                e for e in events 
+                if e.get('event_type') == EventType.PITCH_INTERRUPTED 
+                and e.get('timestamp', '') < first_out_time
+            ])
+        
+        resultado = {
+            "houve_virada": first_out_event is not None,
+            "descricao": None,
+            "turno_critico": None
+        }
+        
+        if first_out_event:
+            # Estimar turno baseado na posição do evento
+            turno_estimado = len([e for e in events if e.get('timestamp', '') <= first_out_event.get('timestamp', '')]) // 2
+            resultado["turno_critico"] = turno_estimado
+            
+            actor = first_out_event.get('actor', '')
+            
+            if first_evasive and first_evasive.get('timestamp', '') < first_out_event.get('timestamp', ''):
+                resultado["descricao"] = f"A mesa virou após resposta evasiva, levando {actor} a sair no turno {turno_estimado}."
+            elif interruptions_before_out >= 2:
+                resultado["descricao"] = f"Após {interruptions_before_out} interrupções, {actor} foi o primeiro a sair no turno {turno_estimado}."
+            else:
+                resultado["descricao"] = f"{actor} foi o primeiro a sair no turno {turno_estimado}, sinalizando mudança no clima da mesa."
+        else:
+            resultado["descricao"] = "A mesa manteve interesse consistente durante toda a sessão."
+        
+        return resultado
