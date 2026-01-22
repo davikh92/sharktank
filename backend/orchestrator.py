@@ -196,6 +196,11 @@ class Orchestrator:
         # 5. Decidir próximo evento
         active_sharks = [s for s in self.sharks if not s.state.is_out]
         
+        # Limite máximo de turnos (20-25 turnos)
+        if self.turn_count >= 20:
+            # Forçar encerramento após 20 turnos
+            return await self._end_session(messages, events)
+        
         if not active_sharks:
             # Todos saíram - encerrar sessão
             return await self._end_session(messages, events)
