@@ -286,61 +286,61 @@ class SharkAgent:
     def should_go_out(self, turn_count: int) -> bool:
         """
         Decide se o shark deve sair
-        Sistema mais determinístico em situações críticas
+        NUNCA 100% (exceto paciência crítica ou contradição grave)
         """
         if self.state.is_out:
             return False
         
-        # Primeiros 4 turnos: proteção - observam antes de julgar
+        # Primeiros 4 turnos: proteção
         if turn_count <= 4:
             if self.state.latent_decision == "OUT":
                 return random.random() < 0.15
             return False
         
-        # DETERMINÍSTICO: Decisão OUT é mandatória
-        if self.state.latent_decision == "OUT":
+        # DETERMINÍSTICO: Apenas em casos EXTREMOS
+        # 1. Paciência crítica (< 5)
+        if self.state.patience < 5:
             return True
         
-        # DETERMINÍSTICO: Paciência crítica (<10) força saída
-        if self.state.patience < 10:
-            return True
-        
-        # DETERMINÍSTICO: LEANING_OUT após turno 12 vira saída
-        if self.state.latent_decision == "LEANING_OUT" and turn_count >= 12:
-            return True
+        # 2. Contradição grave detectada recentemente
+        if self.confianca < 15 and self.state.latent_decision == "OUT":
+            return random.random() < 0.95  # 95%, não 100%
         
         # Calcular saúde composta
         health = self._calculate_health()
         
-        # DETERMINÍSTICO: Saúde crítica (<20) após turno 10
-        if health < 20 and turn_count >= 10:
-            return True
+        # Decisão OUT: alta probabilidade mas não garantida
+        if self.state.latent_decision == "OUT":
+            # 90-95% dependendo da saúde
+            prob = 0.90 if health > 15 else 0.95
+            return random.random() < prob
         
-        # Probabilidade base baseada em saúde (para casos intermediários)
-        if health < 35:
-            base_prob = 0.70
-        elif health < 50:
-            base_prob = 0.50
-        else:
-            base_prob = 0.20
-        
-        # Pattern score influencia
-        pattern_score = self.response_memory.get_pattern_score()
-        
-        if pattern_score < -2.0:
-            base_prob *= 1.5
-        elif pattern_score > 2.0:
-            base_prob *= 0.6
-        
-        # Multiplicador temporal
-        if turn_count >= 10:
-            time_multiplier = 1.2
-            if turn_count >= 15:
-                time_multiplier = 1.5
-            base_prob *= time_multiplier
-        
-        # LEANING_OUT usa probabilidade calculada
+        # LEANING_OUT: probabilidade cresce com tempo
         if self.state.latent_decision == "LEANING_OUT":
+            # Base depende de saúde
+            if health < 20:
+                base_prob = 0.65
+            elif health < 35:
+                base_prob = 0.50
+            else:
+                base_prob = 0.35
+            
+            # Pattern score influencia
+            pattern_score = self.response_memory.get_pattern_score()
+            if pattern_score < -2.0:
+                base_prob *= 1.4
+            elif pattern_score > 2.0:
+                base_prob *= 0.7
+            
+            # Multiplicador temporal (após turno 10)
+            if turn_count >= 10:
+                time_mult = 1.3
+                if turn_count >= 14:
+                    time_mult = 1.6
+                base_prob *= time_mult
+            
+            # Nunca 100%
+            base_prob = min(0.92, base_prob)
             return random.random() < base_prob
         
         return False
