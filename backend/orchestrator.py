@@ -1,4 +1,3 @@
-import random
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
 import uuid
@@ -16,6 +15,37 @@ load_dotenv()
 
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY')
 
+class ResponseMemory:
+    """Memória ponderada de respostas"""
+    def __init__(self):
+        self.history: List[Dict[str, Any]] = []
+    
+    def add_response(self, quality: int, details: Dict[str, Any]):
+        """Adiciona resposta com peso inicial 1.0"""
+        self.history.append({
+            'quality': quality,  # -1, 0, +1
+            'peso': 1.0,
+            'details': details
+        })
+    
+    def decay_weights(self):
+        """Aplica decaimento suave em todos os pesos"""
+        for item in self.history:
+            item['peso'] *= 0.85
+    
+    def get_pattern_score(self) -> float:
+        """Calcula score de padrão ponderado"""
+        if not self.history:
+            return 0.0
+        return sum(item['quality'] * item['peso'] for item in self.history)
+    
+    def get_recent_trend(self, n: int = 3) -> float:
+        """Pega tendência das últimas N respostas"""
+        recent = self.history[-n:] if len(self.history) >= n else self.history
+        if not recent:
+            return 0.0
+        return sum(item['quality'] for item in recent) / len(recent)
+
 class SharkAgent:
     def __init__(self, shark_id: str, archetype_data: Dict[str, Any], session_context: str):
         self.shark_id = shark_id
@@ -23,6 +53,15 @@ class SharkAgent:
         self.state = SharkState()
         self.session_context = session_context
         self.conversation_memory: List[str] = []
+        
+        # Nova camada: memória ponderada
+        self.response_memory = ResponseMemory()
+        
+        # Nova camada: confiança implícita (0-100)
+        self.confianca = 50.0
+        
+        # Nova camada: fadiga temporal (0-100)
+        self.fadiga = 0.0
         
     def update_state_from_answer(self, answer: str, answer_quality: Dict[str, Any]):
         """Atualiza o estado interno do shark baseado na resposta do usuário"""
