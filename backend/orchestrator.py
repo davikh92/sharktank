@@ -96,8 +96,11 @@ class SharkAgent:
             return False
         if self.state.latent_decision == "OUT":
             return True
-        if self.state.latent_decision == "LEANING_OUT" and random.random() < 0.40:
+        if self.state.latent_decision == "LEANING_OUT" and random.random() < 0.60:  # Aumentado de 0.40
             return True
+        # Chance extra de sair se interesse ou paciência muito baixos
+        if self.state.interest < 25 or self.state.patience < 20:
+            return random.random() < 0.30
         return False
 
     async def generate_speech(self, intent: str, context: str) -> str:
