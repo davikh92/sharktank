@@ -1,15 +1,26 @@
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict
-from typing import List
+from typing import List, Optional
 import uuid
 from datetime import datetime, timezone
+import random
 
+from models import (
+    UserRegister, UserLogin, TokenResponse, UserResponse,
+    SessionCreate, SessionResponse, SessionStatus, SharkState,
+    UserMessageSubmit, OrchestratorResponse,
+    MessageResponse, EventResponse, ReportResponse,
+    EventType, SessionSharkResponse
+)
+from auth import hash_password, verify_password, create_access_token, get_current_user
+from shark_archetypes import get_all_archetypes, get_archetype_by_name
+from orchestrator import Orchestrator
+from report_generator import ReportGenerator
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -19,52 +30,428 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-# Create the main app without a prefix
-app = FastAPI()
+# Create the main app
+app = FastAPI(title="Investor Panel Simulator")
 
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
+# ============= AUTH ENDPOINTS =============
 
-# Define Models
-class StatusCheck(BaseModel):
-    model_config = ConfigDict(extra="ignore")  # Ignore MongoDB's _id field
+@api_router.post("/auth/register", response_model=TokenResponse)
+async def register(user_data: UserRegister):
+    # Verificar se usuário já existe
+    existing_user = await db.users.find_one({"email": user_data.email}, {"_id": 0})
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email já cadastrado")
     
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    # Criar usuário
+    user_id = str(uuid.uuid4())
+    created_at = datetime.now(timezone.utc).isoformat()
+    
+    user_doc = {
+        "id": user_id,
+        "email": user_data.email,
+        "password_hash": hash_password(user_data.password),
+        "created_at": created_at
+    }
+    
+    await db.users.insert_one(user_doc)
+    
+    # Criar token
+    token = create_access_token({"user_id": user_id, "email": user_data.email})
+    
+    return TokenResponse(
+        access_token=token,
+        token_type="bearer",
+        user=UserResponse(id=user_id, email=user_data.email, created_at=created_at)
+    )
 
-class StatusCheckCreate(BaseModel):
-    client_name: str
+@api_router.post("/auth/login", response_model=TokenResponse)
+async def login(credentials: UserLogin):
+    # Buscar usuário
+    user = await db.users.find_one({"email": credentials.email}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=401, detail="Credenciais inválidas")
+    
+    # Verificar senha
+    if not verify_password(credentials.password, user['password_hash']):
+        raise HTTPException(status_code=401, detail="Credenciais inválidas")
+    
+    # Criar token
+    token = create_access_token({"user_id": user['id'], "email": user['email']})
+    
+    return TokenResponse(
+        access_token=token,
+        token_type="bearer",
+        user=UserResponse(id=user['id'], email=user['email'], created_at=user['created_at'])
+    )
 
-# Add your routes to the router instead of directly to app
+@api_router.get("/auth/me", response_model=UserResponse)
+async def get_me(current_user: dict = Depends(get_current_user)):
+    user = await db.users.find_one({"id": current_user['user_id']}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    
+    return UserResponse(id=user['id'], email=user['email'], created_at=user['created_at'])
+
+# ============= SHARK ARCHETYPES =============
+
+@api_router.get("/sharks")
+async def get_sharks():
+    return {"sharks": get_all_archetypes()}
+
+# ============= SESSION ENDPOINTS =============
+
+@api_router.post("/sessions", response_model=SessionResponse)
+async def create_session(
+    session_data: SessionCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    session_id = str(uuid.uuid4())
+    created_at = datetime.now(timezone.utc).isoformat()
+    
+    # Selecionar painel de sharks
+    all_archetypes = get_all_archetypes()
+    
+    if session_data.panel_selection:
+        # Usuário escolheu sharks específicos
+        selected_archetypes = []
+        for name in session_data.panel_selection:
+            arch = get_archetype_by_name(name)
+            if arch:
+                selected_archetypes.append(arch)
+        
+        if len(selected_archetypes) != 4:
+            raise HTTPException(status_code=400, detail="Deve selecionar exatamente 4 sharks")
+    else:
+        # Random (todos os 4)
+        selected_archetypes = all_archetypes
+    
+    # Criar sessão
+    session_doc = {
+        "id": session_id,
+        "user_id": current_user['user_id'],
+        "pitch": session_data.pitch.model_dump(),
+        "panel_selection": session_data.panel_selection,
+        "reading_hints_enabled": session_data.reading_hints_enabled,
+        "status": SessionStatus.PENDING,
+        "created_at": created_at
+    }
+    
+    await db.sessions.insert_one(session_doc)
+    
+    # Criar sharks da sessão
+    sharks_response = []
+    for archetype in selected_archetypes:
+        shark_id = str(uuid.uuid4())
+        initial_state = SharkState()
+        
+        shark_doc = {
+            "shark_id": shark_id,
+            "session_id": session_id,
+            "archetype_id": archetype['id'],
+            "archetype_name": archetype['name'],
+            "state": initial_state.model_dump(),
+            "is_out": False
+        }
+        
+        await db.session_sharks.insert_one(shark_doc)
+        
+        sharks_response.append(SessionSharkResponse(
+            shark_id=shark_id,
+            archetype_name=archetype['name'],
+            state=initial_state
+        ))
+    
+    # Criar evento SESSION_STARTED
+    await db.events.insert_one({
+        "id": str(uuid.uuid4()),
+        "session_id": session_id,
+        "event_type": EventType.SESSION_STARTED,
+        "actor": "SYSTEM",
+        "timestamp": created_at,
+        "data": {}
+    })
+    
+    # Criar evento PITCH_SUBMITTED
+    await db.events.insert_one({
+        "id": str(uuid.uuid4()),
+        "session_id": session_id,
+        "event_type": EventType.PITCH_SUBMITTED,
+        "actor": "USER",
+        "timestamp": created_at,
+        "data": session_data.pitch.model_dump()
+    })
+    
+    return SessionResponse(
+        id=session_id,
+        user_id=current_user['user_id'],
+        pitch=session_data.pitch,
+        panel_selection=session_data.panel_selection,
+        reading_hints_enabled=session_data.reading_hints_enabled,
+        status=SessionStatus.PENDING,
+        created_at=created_at,
+        sharks=sharks_response
+    )
+
+@api_router.get("/sessions", response_model=List[SessionResponse])
+async def list_sessions(current_user: dict = Depends(get_current_user)):
+    sessions = await db.sessions.find(
+        {"user_id": current_user['user_id']},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    
+    result = []
+    for session in sessions:
+        sharks = await db.session_sharks.find(
+            {"session_id": session['id']},
+            {"_id": 0}
+        ).to_list(10)
+        
+        sharks_response = [
+            SessionSharkResponse(
+                shark_id=s['shark_id'],
+                archetype_name=s['archetype_name'],
+                state=SharkState(**s['state'])
+            )
+            for s in sharks
+        ]
+        
+        from models import PitchData
+        result.append(SessionResponse(
+            id=session['id'],
+            user_id=session['user_id'],
+            pitch=PitchData(**session['pitch']),
+            panel_selection=session.get('panel_selection'),
+            reading_hints_enabled=session.get('reading_hints_enabled', False),
+            status=session['status'],
+            created_at=session['created_at'],
+            sharks=sharks_response
+        ))
+    
+    return result
+
+@api_router.get("/sessions/{session_id}", response_model=SessionResponse)
+async def get_session(
+    session_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    session = await db.sessions.find_one({"id": session_id}, {"_id": 0})
+    if not session:
+        raise HTTPException(status_code=404, detail="Sessão não encontrada")
+    
+    if session['user_id'] != current_user['user_id']:
+        raise HTTPException(status_code=403, detail="Acesso negado")
+    
+    sharks = await db.session_sharks.find(
+        {"session_id": session_id},
+        {"_id": 0}
+    ).to_list(10)
+    
+    sharks_response = [
+        SessionSharkResponse(
+            shark_id=s['shark_id'],
+            archetype_name=s['archetype_name'],
+            state=SharkState(**s['state'])
+        )
+        for s in sharks
+    ]
+    
+    from models import PitchData
+    return SessionResponse(
+        id=session['id'],
+        user_id=session['user_id'],
+        pitch=PitchData(**session['pitch']),
+        panel_selection=session.get('panel_selection'),
+        reading_hints_enabled=session.get('reading_hints_enabled', False),
+        status=session['status'],
+        created_at=session['created_at'],
+        sharks=sharks_response
+    )
+
+# ============= CONVERSATION / ORCHESTRATOR =============
+
+@api_router.post("/sessions/{session_id}/start", response_model=OrchestratorResponse)
+async def start_session(
+    session_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    session = await db.sessions.find_one({"id": session_id}, {"_id": 0})
+    if not session:
+        raise HTTPException(status_code=404, detail="Sessão não encontrada")
+    
+    if session['user_id'] != current_user['user_id']:
+        raise HTTPException(status_code=403, detail="Acesso negado")
+    
+    # Atualizar status para IN_PROGRESS
+    await db.sessions.update_one(
+        {"id": session_id},
+        {"$set": {"status": SessionStatus.IN_PROGRESS}}
+    )
+    
+    # Buscar sharks
+    sharks = await db.session_sharks.find({"session_id": session_id}, {"_id": 0}).to_list(10)
+    
+    # Criar orquestrador
+    orchestrator = Orchestrator(db, session_id, session['pitch'], sharks)
+    
+    # Gerar primeira pergunta de um shark aleatório
+    first_shark = random.choice(orchestrator.sharks)
+    
+    from orchestrator import MessageType
+    context = f"Você está começando a avaliação do pitch: {session['pitch']['titulo']}. Faça uma pergunta inicial incisiva."
+    first_question = await first_shark.generate_speech("QUESTION", context)
+    
+    # Salvar primeira mensagem
+    message_id = str(uuid.uuid4())
+    timestamp = datetime.now(timezone.utc).isoformat()
+    
+    message_doc = {
+        "id": message_id,
+        "session_id": session_id,
+        "speaker": first_shark.archetype['name'],
+        "content": first_question,
+        "message_type": MessageType.QUESTION,
+        "timestamp": timestamp
+    }
+    
+    await db.messages.insert_one(message_doc)
+    
+    # Criar evento
+    await db.events.insert_one({
+        "id": str(uuid.uuid4()),
+        "session_id": session_id,
+        "event_type": EventType.QUESTION_ASKED,
+        "actor": first_shark.archetype['name'],
+        "timestamp": timestamp,
+        "data": {"question": first_question}
+    })
+    
+    return OrchestratorResponse(
+        messages=[MessageResponse(**message_doc)],
+        events=[],
+        session_status=SessionStatus.IN_PROGRESS,
+        can_user_respond=True,
+        reading_hint=None
+    )
+
+@api_router.post("/sessions/{session_id}/respond", response_model=OrchestratorResponse)
+async def respond_to_session(
+    session_id: str,
+    user_message: UserMessageSubmit,
+    current_user: dict = Depends(get_current_user)
+):
+    session = await db.sessions.find_one({"id": session_id}, {"_id": 0})
+    if not session:
+        raise HTTPException(status_code=404, detail="Sessão não encontrada")
+    
+    if session['user_id'] != current_user['user_id']:
+        raise HTTPException(status_code=403, detail="Acesso negado")
+    
+    if session['status'] != SessionStatus.IN_PROGRESS:
+        raise HTTPException(status_code=400, detail="Sessão não está em andamento")
+    
+    # Buscar sharks
+    sharks = await db.session_sharks.find({"session_id": session_id}, {"_id": 0}).to_list(10)
+    
+    # Criar orquestrador
+    orchestrator = Orchestrator(db, session_id, session['pitch'], sharks)
+    
+    # Processar resposta
+    response = await orchestrator.process_user_answer(user_message.content)
+    
+    return response
+
+@api_router.get("/sessions/{session_id}/messages", response_model=List[MessageResponse])
+async def get_session_messages(
+    session_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    session = await db.sessions.find_one({"id": session_id}, {"_id": 0})
+    if not session:
+        raise HTTPException(status_code=404, detail="Sessão não encontrada")
+    
+    if session['user_id'] != current_user['user_id']:
+        raise HTTPException(status_code=403, detail="Acesso negado")
+    
+    messages = await db.messages.find(
+        {"session_id": session_id},
+        {"_id": 0}
+    ).sort("timestamp", 1).to_list(1000)
+    
+    return [MessageResponse(**m) for m in messages]
+
+@api_router.get("/sessions/{session_id}/events", response_model=List[EventResponse])
+async def get_session_events(
+    session_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    session = await db.sessions.find_one({"id": session_id}, {"_id": 0})
+    if not session:
+        raise HTTPException(status_code=404, detail="Sessão não encontrada")
+    
+    if session['user_id'] != current_user['user_id']:
+        raise HTTPException(status_code=403, detail="Acesso negado")
+    
+    events = await db.events.find(
+        {"session_id": session_id},
+        {"_id": 0}
+    ).sort("timestamp", 1).to_list(1000)
+    
+    return [EventResponse(**e) for e in events]
+
+# ============= REPORTS =============
+
+@api_router.post("/sessions/{session_id}/report", response_model=ReportResponse)
+async def generate_report(
+    session_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    session = await db.sessions.find_one({"id": session_id}, {"_id": 0})
+    if not session:
+        raise HTTPException(status_code=404, detail="Sessão não encontrada")
+    
+    if session['user_id'] != current_user['user_id']:
+        raise HTTPException(status_code=403, detail="Acesso negado")
+    
+    if session['status'] != SessionStatus.COMPLETED:
+        raise HTTPException(status_code=400, detail="Sessão ainda não foi concluída")
+    
+    # Verificar se já existe relatório
+    existing_report = await db.reports.find_one({"session_id": session_id}, {"_id": 0})
+    if existing_report:
+        return ReportResponse(**existing_report)
+    
+    # Gerar novo relatório
+    generator = ReportGenerator(db, session_id)
+    report = await generator.generate_report()
+    
+    return report
+
+@api_router.get("/sessions/{session_id}/report", response_model=ReportResponse)
+async def get_report(
+    session_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    session = await db.sessions.find_one({"id": session_id}, {"_id": 0})
+    if not session:
+        raise HTTPException(status_code=404, detail="Sessão não encontrada")
+    
+    if session['user_id'] != current_user['user_id']:
+        raise HTTPException(status_code=403, detail="Acesso negado")
+    
+    report = await db.reports.find_one({"session_id": session_id}, {"_id": 0})
+    if not report:
+        raise HTTPException(status_code=404, detail="Relatório não encontrado")
+    
+    return ReportResponse(**report)
+
+# ============= ROOT ENDPOINT =============
+
 @api_router.get("/")
 async def root():
-    return {"message": "Hello World"}
-
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.model_dump()
-    status_obj = StatusCheck(**status_dict)
-    
-    # Convert to dict and serialize datetime to ISO string for MongoDB
-    doc = status_obj.model_dump()
-    doc['timestamp'] = doc['timestamp'].isoformat()
-    
-    _ = await db.status_checks.insert_one(doc)
-    return status_obj
-
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    # Exclude MongoDB's _id field from the query results
-    status_checks = await db.status_checks.find({}, {"_id": 0}).to_list(1000)
-    
-    # Convert ISO string timestamps back to datetime objects
-    for check in status_checks:
-        if isinstance(check['timestamp'], str):
-            check['timestamp'] = datetime.fromisoformat(check['timestamp'])
-    
-    return status_checks
+    return {"message": "Investor Panel Simulator API"}
 
 # Include the router in the main app
 app.include_router(api_router)
