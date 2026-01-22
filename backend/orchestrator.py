@@ -90,17 +90,54 @@ class SharkAgent:
             return random.random() < 0.30
         return random.random() < 0.15
         
-    def should_go_out(self) -> bool:
-        """Decide se o shark deve sair"""
+    def should_go_out(self, turn_count: int) -> bool:
+        """Decide se o shark deve sair (com multiplicador progressivo)"""
         if self.state.is_out:
             return False
+        
+        # Primeiros 3-4 turnos: proteção - saída é rara
+        if turn_count <= 4:
+            if self.state.latent_decision == "OUT":
+                return random.random() < 0.15  # Apenas 15% mesmo com decisão OUT
+            return False
+        
+        # Decisão OUT: deve sair
         if self.state.latent_decision == "OUT":
             return True
-        if self.state.latent_decision == "LEANING_OUT" and random.random() < 0.60:  # Aumentado de 0.40
-            return True
-        # Chance extra de sair se interesse ou paciência muito baixos
-        if self.state.interest < 25 or self.state.patience < 20:
-            return random.random() < 0.30
+        
+        # Decisão LEANING_OUT: probabilidade base
+        base_probability = 0.40
+        
+        # A partir do turno 10: multiplicador progressivo baseado no estado
+        if turn_count >= 10:
+            # Calcular "saúde" do shark (0-100)
+            health_score = (self.state.interest + self.state.patience) / 2
+            
+            # Multiplicador: quanto pior o estado, maior a chance
+            if health_score < 20:
+                multiplier = 3.0  # Saúde crítica
+            elif health_score < 35:
+                multiplier = 2.0  # Saúde baixa
+            elif health_score < 50:
+                multiplier = 1.5  # Saúde média-baixa
+            else:
+                multiplier = 1.0  # Saúde OK
+            
+            # Aumenta multiplicador progressivamente após turno 15
+            if turn_count >= 15:
+                multiplier *= 1.3
+            if turn_count >= 18:
+                multiplier *= 1.5
+            
+            base_probability *= multiplier
+        
+        if self.state.latent_decision == "LEANING_OUT":
+            return random.random() < base_probability
+        
+        # Chance mínima se estado muito ruim
+        if self.state.interest < 20 or self.state.patience < 15:
+            return random.random() < 0.25
+        
         return False
 
     async def generate_speech(self, intent: str, context: str) -> str:
