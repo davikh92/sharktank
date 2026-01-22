@@ -266,7 +266,7 @@ class Orchestrator:
             events.append(interrupt_event)
         
         # Chance de shark sair
-        if responding_shark.should_go_out():
+        if responding_shark.should_go_out(self.turn_count):
             out_msg, out_event = await self._generate_out(responding_shark)
             messages.append(out_msg)
             events.append(out_event)
