@@ -29,6 +29,7 @@ class MessageType(str, Enum):
     COMMENT = "COMMENT"
     INTERRUPTION = "INTERRUPTION"
     OUT_ANNOUNCEMENT = "OUT_ANNOUNCEMENT"
+    OFFER = "OFFER"
 
 class UserRegister(BaseModel):
     email: EmailStr
