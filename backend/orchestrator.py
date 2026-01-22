@@ -204,6 +204,13 @@ class Orchestrator:
         
         # Limite máximo de turnos (20-25 turnos)
         if self.turn_count >= 20:
+            # Adicionar mensagem de encerramento
+            closing_msg = await self._save_message(
+                "SYSTEM",
+                "A sessão chegou ao tempo limite. Os investidores estão fazendo suas considerações finais.",
+                MessageType.COMMENT
+            )
+            messages.append(closing_msg)
             # Forçar encerramento após 20 turnos
             return await self._end_session(messages, events)
         
