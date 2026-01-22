@@ -48,21 +48,19 @@ class ResponseMemory:
         return sum(item['quality'] for item in recent) / len(recent)
 
 class SharkAgent:
-    def __init__(self, shark_id: str, archetype_data: Dict[str, Any], session_context: str):
+    def __init__(self, shark_id: str, archetype_data: Dict[str, Any], session_context: str, initial_state: Optional[SharkState] = None):
         self.shark_id = shark_id
         self.archetype = archetype_data
-        self.state = SharkState()
+        self.state = initial_state if initial_state else SharkState()
         self.session_context = session_context
         self.conversation_memory: List[str] = []
         
         # Nova camada: memória ponderada
         self.response_memory = ResponseMemory()
         
-        # Nova camada: confiança implícita (0-100)
-        self.confianca = 50.0
-        
-        # Nova camada: fadiga temporal (0-100)
-        self.fadiga = 0.0
+        # Usar valores do state se fornecido
+        self.confianca = self.state.confianca
+        self.fadiga = self.state.fadiga
         
     def _evaluate_response_quality(self, answer: str, answer_analysis: Dict[str, Any]) -> int:
         """
