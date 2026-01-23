@@ -1198,28 +1198,6 @@ Seja direto e sem rodeios. Use o estilo: {shark.archetype['estilo']}."""
         
         return message, event
     
-    async def _generate_offer(self, shark: SharkAgent) -> tuple:
-        """Gera uma oferta do shark"""
-        context = f"""Você está MUITO interessado neste negócio.
-Faça uma oferta concreta e direta.
-Seja específico com valor e % equity que você ofereceria.
-Mantenha seu estilo: {shark.archetype['estilo']}."""
-        
-        speech = await shark.generate_speech("OFFER", context)
-        
-        message = await self._save_message(shark.archetype['name'], speech, MessageType.OFFER)
-        event = await self._save_event(
-            EventType.SHARK_OFFER,
-            shark.archetype['name'],
-            {
-                "offer": speech,
-                "interest_level": shark.state.interest,
-                "confidence_level": shark.confianca
-            }
-        )
-        
-        return message, event
-    
     async def _generate_interruption(self, shark: SharkAgent) -> tuple:
         """Gera uma interrupção do shark"""
         context = "Você está interrompendo o empreendedor porque não está satisfeito com a direção da conversa."
@@ -1252,25 +1230,6 @@ Mantenha seu estilo: {shark.archetype['estilo']}."""
         )
         
         return message, event
-    
-    async def _end_session(self, messages: List[MessageResponse], events: List[EventResponse]) -> OrchestratorResponse:
-        """Encerra a sessão"""
-        end_event = await self._save_event(EventType.SESSION_ENDED, "SYSTEM", {"turn_count": self.turn_count})
-        events.append(end_event)
-        
-        # Atualizar status da sessão
-        await self.db.sessions.update_one(
-            {"id": self.session_id},
-            {"$set": {"status": SessionStatus.COMPLETED}}
-        )
-        
-        return OrchestratorResponse(
-            messages=messages,
-            events=events,
-            session_status=SessionStatus.COMPLETED,
-            can_user_respond=False,
-            reading_hint=None
-        )
     
     def _generate_reading_hint(self) -> Optional[str]:
         """Gera dica de leitura de mesa"""
