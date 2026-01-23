@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getReport, generateReport } from '../api';
 import { toast } from 'sonner';
@@ -10,11 +10,20 @@ const Report = () => {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
 
-  useEffect(() => {
-    loadReport();
+  const handleGenerateReport = useCallback(async () => {
+    setGenerating(true);
+    try {
+      const response = await generateReport(sessionId);
+      setReport(response.data);
+      toast.success('Relatório gerado');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao gerar relatório');
+    } finally {
+      setGenerating(false);
+    }
   }, [sessionId]);
 
-  const loadReport = async () => {
+  const loadReport = useCallback(async () => {
     try {
       const response = await getReport(sessionId);
       setReport(response.data);
@@ -27,20 +36,11 @@ const Report = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [sessionId, handleGenerateReport]);
 
-  const handleGenerateReport = async () => {
-    setGenerating(true);
-    try {
-      const response = await generateReport(sessionId);
-      setReport(response.data);
-      toast.success('Relatório gerado');
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao gerar relatório');
-    } finally {
-      setGenerating(false);
-    }
-  };
+  useEffect(() => {
+    loadReport();
+  }, [loadReport]);
 
   if (loading || generating) {
     return (
