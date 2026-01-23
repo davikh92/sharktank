@@ -274,7 +274,7 @@ class ReportGenerator:
         return leitura
     
     def _generate_shark_thoughts(self, name: str, state: Dict, is_out: bool, made_offer: bool, withdrawn: bool, accepted: bool, pitch_eval: Dict) -> str:
-        """Gera os 'pensamentos' do shark durante a sessão"""
+        """Gera os 'pensamentos' do shark durante a sessão - COM VARIAÇÕES POR ARQUÉTIPO"""
         interest = state.get('interest', 50)
         confianca_ideia = state.get('confianca_ideia', 50)
         confianca_apresentacao = state.get('confianca_apresentacao', 50)
@@ -282,32 +282,247 @@ class ReportGenerator:
         # Diferença entre ideia e apresentação
         idea_vs_presentation = confianca_ideia - confianca_apresentacao
         
+        # Frases específicas por arquétipo
+        archetype_phrases = {
+            "O Operador": {
+                "accepted": [
+                    "Vi um time que sabe executar. O plano é realista e sei onde posso agregar.",
+                    "Gostei da clareza operacional. Dá pra construir algo grande aqui.",
+                    "Organização, processos, visão de escala. É o tipo de deal que eu busco."
+                ],
+                "withdrawn": [
+                    "Ofereci minha experiência, mas a hesitação mostrou que não estavam prontos.",
+                    "Quem demora demais pra decidir vai demorar demais pra executar.",
+                    "Fiz minha oferta. A janela fechou. Vida que segue."
+                ],
+                "offer_not_accepted": [
+                    "Estava disposto a entrar, mas não chegamos a um acordo. Execução requer decisão.",
+                    "O deal fazia sentido, mas não rolou. Às vezes a química não bate.",
+                    "Ofereci. Não fechou. Talvez em outro momento."
+                ],
+                "out_low_interest": [
+                    "Não vi clareza de execução. Quem vai fazer isso acontecer?",
+                    "Faltou mostrar quem é o dono da operação. Ideias sem dono não escalam.",
+                    "O pitch foi bonito, mas não vi plano de como chegar lá."
+                ],
+                "out_idea_vs_presentation": [
+                    "A ideia tem mérito, mas não confio que esse time entrega.",
+                    "Potencial existe, mas a execução parecia desorganizada.",
+                    "Gostei do conceito, mas não vi maturidade operacional."
+                ],
+                "out_presentation_vs_idea": [
+                    "Apresentou bem, mas o modelo de operação não fecha.",
+                    "Soube vender, mas não soube explicar como vai operar.",
+                    "Eloquência não compensa falta de plano concreto."
+                ],
+                "out_neutral": [
+                    "O risco operacional não compensava o retorno.",
+                    "Vi complexidade demais pro estágio atual.",
+                    "Não era o tipo de operação que eu consigo ajudar."
+                ],
+                "stayed_high_interest": [
+                    "Quase ofertei. Faltou um número que me desse confiança.",
+                    "Vi potencial de execução, mas precisava de mais dados.",
+                    "Gostei do que vi, mas não o suficiente pra assinar o cheque."
+                ],
+                "stayed_medium_interest": [
+                    "Interessante, mas não era o perfil de operação que busco.",
+                    "Acompanhei com atenção, mas faltou o click.",
+                    "Vi mérito, mas não vi fit com meu perfil de investimento."
+                ],
+                "stayed_low_interest": [
+                    "Não era pra mim desde o início. Mas dei uma chance.",
+                    "Escutei por educação. Não era meu jogo.",
+                    "Fora do meu escopo de atuação."
+                ]
+            },
+            "O Financeiro": {
+                "accepted": [
+                    "Os números fecham. Margem saudável, unit economics claros. Entrei.",
+                    "CAC, LTV, payback — tudo fazia sentido. Deal justo.",
+                    "Vi um caminho pra lucratividade. É raro, e por isso investi."
+                ],
+                "withdrawn": [
+                    "Ofereci porque os números pareciam bons. A indecisão me fez repensar.",
+                    "Hesitação na mesa é sinal de hesitação na gestão financeira.",
+                    "Retirei porque quem não decide rápido geralmente queima caixa rápido."
+                ],
+                "offer_not_accepted": [
+                    "O valuation não batia com minha análise. Não forço deal.",
+                    "Estava interessado, mas o preço pedido não justificava o risco.",
+                    "Quase fechamos, mas a conta não fechou."
+                ],
+                "out_low_interest": [
+                    "Os números não tinham fundamento. Unit economics inexistentes.",
+                    "Não vi caminho pra margem. Sem margem, sem deal.",
+                    "Faltou responder sobre CAC, LTV, churn. Básico."
+                ],
+                "out_idea_vs_presentation": [
+                    "A ideia pode ter mercado, mas a apresentação financeira foi fraca.",
+                    "Potencial existe, mas não demonstraram que sabem fazer dinheiro.",
+                    "Gostei do conceito. Não gostei de como apresentaram os números."
+                ],
+                "out_presentation_vs_idea": [
+                    "Apresentação polida, mas os fundamentos financeiros eram fracos.",
+                    "Slides bonitos não compensam unit economics ruins.",
+                    "Vendeu bem uma ideia que não se paga."
+                ],
+                "out_neutral": [
+                    "O retorno esperado não justificava o risco do estágio.",
+                    "Matematicamente, não fazia sentido pro meu portfólio.",
+                    "Prefiro passar a entrar em algo que não fecha a conta."
+                ],
+                "stayed_high_interest": [
+                    "Os números estavam quase lá. Faltou um trimestre de dados.",
+                    "Vi potencial de margem, mas precisava de mais tração comprovada.",
+                    "Quase ofertei. O valuation me fez recuar."
+                ],
+                "stayed_medium_interest": [
+                    "Números razoáveis, mas não excepcionais. Fiquei na observação.",
+                    "Interessante financeiramente, mas sem urgência de investir.",
+                    "Vi mérito, mas o retorno ajustado ao risco não me convenceu."
+                ],
+                "stayed_low_interest": [
+                    "Não era o tipo de deal financeiro que busco.",
+                    "Os números não me animaram em nenhum momento.",
+                    "Fora do perfil de risco/retorno que aceito."
+                ]
+            },
+            "O Cético": {
+                "accepted": [
+                    "Provaram que o diferencial era real. Não é comum, por isso entrei.",
+                    "Conseguiram responder minhas dúvidas mais difíceis. Raro.",
+                    "Vi barreira de entrada defensável. É o que procuro."
+                ],
+                "withdrawn": [
+                    "Ofereci, mas a hesitação confirmou minhas dúvidas iniciais.",
+                    "Quem não decide na pressão não vai sobreviver na competição.",
+                    "Minha oferta tinha prazo. Prazo passou. Simples."
+                ],
+                "offer_not_accepted": [
+                    "Estava disposto a apostar, mas não conseguimos alinhar.",
+                    "Fiz uma oferta justa pelo risco. Não aceitaram. Paciência.",
+                    "Deal não fechou, mas não me arrependo de ter tentado."
+                ],
+                "out_low_interest": [
+                    "Não vi diferencial. Qualquer um pode copiar isso amanhã.",
+                    "Sem barreira de entrada, é questão de tempo até a concorrência esmagar.",
+                    "O mercado já tem três soluções iguais. Por que mais uma?"
+                ],
+                "out_idea_vs_presentation": [
+                    "A ideia pode ser boa, mas não me convenceram de que é defensável.",
+                    "Potencial existe, mas a apresentação aumentou minhas dúvidas.",
+                    "Gostei do conceito, mas não vi como vão se proteger."
+                ],
+                "out_presentation_vs_idea": [
+                    "Apresentação competente, mas a ideia tem flancos demais.",
+                    "Soube vender, mas não soube defender. Vulnerável.",
+                    "Eloquente, mas sem substância defensável."
+                ],
+                "out_neutral": [
+                    "Muitas incertezas, poucas respostas convincentes.",
+                    "Prefiro negócios onde vejo moat claro.",
+                    "O risco de ser copiado era maior que o potencial de retorno."
+                ],
+                "stayed_high_interest": [
+                    "Quase me convenceram. Uma resposta melhor e eu teria ofertado.",
+                    "Vi algo, mas minhas dúvidas não foram totalmente sanadas.",
+                    "Interessante, mas não o suficiente pra vencer meu ceticismo."
+                ],
+                "stayed_medium_interest": [
+                    "Algumas respostas boas, outras nem tanto. Fiquei no muro.",
+                    "Vi pontos fortes e fracos. No balanço, não me convenceu.",
+                    "Interessante, mas cheio de 'ses' e 'talvez'."
+                ],
+                "stayed_low_interest": [
+                    "Confirmou minhas suspeitas iniciais. Não era pra mim.",
+                    "Minhas dúvidas só aumentaram durante a sessão.",
+                    "Cada resposta gerava mais perguntas."
+                ]
+            },
+            "O Visionário": {
+                "accepted": [
+                    "Vi o futuro nessa ideia. Timing certo, mercado grande. Entrei.",
+                    "É disruptivo. É ousado. É exatamente o que eu busco.",
+                    "Poucos enxergam o que eu vi aqui. Por isso investi."
+                ],
+                "withdrawn": [
+                    "A visão era grande, mas a hesitação mostrou falta de convicção.",
+                    "Visionários não hesitam quando o momento chega.",
+                    "Ofereci por ver potencial. Retirei por ver medo."
+                ],
+                "offer_not_accepted": [
+                    "Apostei na visão, mas não chegamos a um acordo. Talvez não era o momento.",
+                    "Estava disposto a sonhar junto, mas não rolou a conexão.",
+                    "Deal grande demais pro founder atual, talvez."
+                ],
+                "out_low_interest": [
+                    "Não vi ousadia. Era mais do mesmo com roupa nova.",
+                    "Faltou ambição. Pensar pequeno não me interessa.",
+                    "O mercado que miravam era pequeno demais pro meu apetite."
+                ],
+                "out_idea_vs_presentation": [
+                    "A ideia tinha escala, mas não vi paixão na apresentação.",
+                    "O conceito era grande, mas o founder parecia pequeno.",
+                    "Visão interessante, entrega duvidosa."
+                ],
+                "out_presentation_vs_idea": [
+                    "Apresentou com brilho, mas a ideia era comum.",
+                    "Carisma não compensa falta de inovação real.",
+                    "Vendeu bem uma ideia que já vi cem vezes."
+                ],
+                "out_neutral": [
+                    "Não senti a faísca. Preciso acreditar pra investir.",
+                    "Faltou me fazer sonhar com o que poderia ser.",
+                    "O timing não pareceu certo. Talvez cedo demais, talvez tarde."
+                ],
+                "stayed_high_interest": [
+                    "Quase me apaixonei pela ideia. Faltou um empurrão.",
+                    "Vi potencial de escala, mas precisava de mais convicção do founder.",
+                    "Gostei muito, mas não o suficiente pra assinar o cheque."
+                ],
+                "stayed_medium_interest": [
+                    "Interessante, mas não revolucionário. Fiquei observando.",
+                    "Vi mérito, mas não vi a disrupção que busco.",
+                    "Bom, mas não excepcional. E eu busco excepcional."
+                ],
+                "stayed_low_interest": [
+                    "Não era o tipo de visão que me anima.",
+                    "Muito incremental pro meu gosto.",
+                    "Prefiro apostar em moonshots. Isso não era um."
+                ]
+            }
+        }
+        
+        # Selecionar frases baseado no arquétipo
+        phrases = archetype_phrases.get(name, archetype_phrases["O Operador"])
+        
         if accepted:
-            return "Vi potencial real aqui. O negócio faz sentido para o meu perfil e consegui entrar em termos que funcionam."
+            return random.choice(phrases["accepted"])
         
         if withdrawn:
-            return "Fiz uma oferta, mas o founder hesitou demais. Quando a oportunidade passa, ela não volta."
+            return random.choice(phrases["withdrawn"])
         
         if made_offer and not accepted:
-            return "Eu estava disposto a investir, mas não chegamos a um acordo. Às vezes o timing não é o certo."
+            return random.choice(phrases["offer_not_accepted"])
         
         if is_out:
             if interest < 30:
-                return "Desde o início, não vi aderência à minha tese. O pitch não me convenceu do diferencial."
+                return random.choice(phrases["out_low_interest"])
             elif idea_vs_presentation > 15:
-                return "A ideia tinha potencial, mas a apresentação não me deu confiança de que a execução seria boa."
+                return random.choice(phrases["out_idea_vs_presentation"])
             elif idea_vs_presentation < -15:
-                return "Apresentou bem, mas a ideia em si não me pareceu defensável. Faltou diferencial real."
+                return random.choice(phrases["out_presentation_vs_idea"])
             else:
-                return "Não encontrei o que buscava. O risco não justificava o potencial que vi."
+                return random.choice(phrases["out_neutral"])
         
         # Permaneceu mas não ofertou
         if interest > 70:
-            return "Vi potencial, mas ainda não estava convencido o suficiente para fazer uma oferta. Quase lá."
+            return random.choice(phrases["stayed_high_interest"])
         elif interest > 50:
-            return "Interessante, mas faltaram alguns elementos para eu me sentir confortável em investir."
+            return random.choice(phrases["stayed_medium_interest"])
         else:
-            return "Acompanhei a sessão, mas o negócio não era para mim."
+            return random.choice(phrases["stayed_low_interest"])
     
     def _get_shark_result(self, is_out: bool, made_offer: bool, accepted: bool, withdrawn: bool) -> str:
         """Retorna o resultado final do shark"""
