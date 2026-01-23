@@ -240,16 +240,80 @@ class ReportSection(BaseModel):
     titulo: str
     conteudo: Any
 
+# === MODELO DE LEITURA DO SHARK NO RELATÓRIO ===
+class SharkLeitura(BaseModel):
+    """Leitura individual de um shark no relatório"""
+    shark: str
+    o_que_buscava: str
+    o_que_pensou: str
+    fez_oferta: bool = False
+    oferta_retirada: bool = False
+    fechou_deal: bool = False
+    resultado: str
+    interesse_final: float = 50.0
+    confianca_ideia: float = 50.0
+    confianca_apresentacao: float = 50.0
+
+# === MODELO DE EVENTO NA LINHA DO TEMPO ===
+class TimelineEvent(BaseModel):
+    """Evento na linha do tempo da negociação"""
+    turno: int
+    tipo: str
+    ator: str
+    descricao: str
+
+# === MODELO DE MOMENTO DE VIRADA ===
+class MomentoVirada(BaseModel):
+    """Momento de virada da sessão"""
+    houve_virada: bool = False
+    descricao: str = "A sessão seguiu sem grandes viradas."
+    momento_chave: Optional[str] = None
+
+# === MODELO DE AVALIAÇÃO IDEIA VS APRESENTAÇÃO ===
+class AvaliacaoIdeia(BaseModel):
+    """Avaliação comparativa entre ideia e apresentação"""
+    idea_score: float = 50.0
+    idea_tier: str = "MEDIANA"
+    apresentacao_score: float = 50.0
+    analise: str = ""
+    recomendacao: str = ""
+    componentes: Dict[str, float] = {}
+
+# === MODELO DE AUTÓPSIA (ANÁLISE PROFUNDA) ===
+class AutopsiaAnalise(BaseModel):
+    """Análise profunda no estilo 'autópsia' da sessão"""
+    momento_irreversivel: Optional[str] = None  # "Qual foi o momento irreversível?"
+    primeiro_shark_perdido: Optional[str] = None  # "Qual shark você perdeu primeiro — e por quê?"
+    pergunta_nao_respondida: Optional[str] = None  # "O que você nunca respondeu de verdade?"
+    onde_perdeu_tracao: Optional[str] = None  # Onde perdeu força
+    onde_ganhou_respeito: Optional[str] = None  # Onde ganhou credibilidade
+    risco_desnecessario: Optional[str] = None  # Decisão arriscada desnecessária
+    decisao_que_matou: Optional[str] = None  # Qual decisão "matou" o jogo (se aplicável)
+
+# === MODELO DE MICRO-SINAL NÃO VERBAL ===
+class MicroSinal(BaseModel):
+    """Micro-sinal não verbal observado durante a sessão"""
+    turno: int
+    shark: str
+    sinal: str  # Ex: "olhou o relógio", "anotou algo", "sorriso contido"
+    traducao_psicologica: str  # Ex: "Perdi interesse", "Isso importa"
+
 class ReportResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str
     session_id: str
     sintese: str
-    linha_tempo: List[Dict[str, str]]
-    leitura_sharks: List[Dict[str, Any]]
+    linha_tempo: List[Dict[str, Any]]  # TimelineEvent como dict
+    leitura_sharks: List[Dict[str, Any]]  # SharkLeitura como dict
     sinais_mesa: List[str]
     padroes_apresentador: List[str]
     pontos_sustentacao: List[str]
     veredito: str
-    momento_virada: Optional[Dict[str, Any]] = None
+    momento_virada: Optional[Dict[str, Any]] = None  # MomentoVirada como dict
+    # === NOVOS CAMPOS DO "RELATÓRIO COMO REPLAY" ===
+    pergunta_provocativa: Optional[str] = None
+    avaliacao_idea: Optional[Dict[str, Any]] = None  # AvaliacaoIdeia como dict
+    # === NOVOS CAMPOS DA "AUTÓPSIA" ===
+    autopsia: Optional[Dict[str, Any]] = None  # AutopsiaAnalise como dict
+    micro_sinais: Optional[List[Dict[str, Any]]] = None  # Lista de MicroSinal
     generated_at: str
