@@ -228,7 +228,7 @@ const Landing = () => {
                   </ul>
                   <p className="text-zinc-500 mt-4">
                     Nada vem como recomendação.<br />
-                    Nada vem como "faça assim".
+                    Nada vem como &ldquo;faça assim&rdquo;.
                   </p>
                   <p className="text-white mt-2">
                     É um replay factual da sessão —<br />
