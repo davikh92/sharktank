@@ -367,9 +367,11 @@ async def respond_to_session(
     # Buscar sharks
     sharks = await db.session_sharks.find({"session_id": session_id}, {"_id": 0}).to_list(10)
     
-    # Carregar turn_count persistido da sessão (FIX: não criar nova instância do zero)
+    # Carregar estado persistido da sessão
     current_turn_count = session.get('turn_count', 0)
     current_phase = session.get('phase', 'exploration')
+    current_session_phase = session.get('session_phase', 'PITCHING')
+    negotiation_state = session.get('negotiation_state', None)
     
     # Criar orquestrador COM estado existente
     orchestrator = Orchestrator(
@@ -378,22 +380,105 @@ async def respond_to_session(
         session['pitch'], 
         sharks,
         initial_turn_count=current_turn_count,
-        initial_phase=current_phase
+        initial_phase=current_phase,
+        initial_session_phase=current_session_phase,
+        initial_negotiation_state=negotiation_state
     )
     
     # Processar resposta
     response = await orchestrator.process_user_answer(user_message.content)
     
-    # Persistir turn_count e phase atualizados na sessão
+    # Persistir estado atualizado na sessão
     await db.sessions.update_one(
         {"id": session_id},
         {"$set": {
             "turn_count": orchestrator.turn_count,
-            "phase": orchestrator.phase
+            "phase": orchestrator.phase,
+            "session_phase": orchestrator.session_phase.value
         }}
     )
     
     return response
+
+# ============= FOUNDER ACTION ENDPOINT (NEGOCIAÇÃO) =============
+
+@api_router.post("/sessions/{session_id}/founder-action", response_model=OrchestratorResponse)
+async def process_founder_action(
+    session_id: str,
+    action_request: FounderActionRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Processa a ação do founder em resposta a uma oferta"""
+    session = await db.sessions.find_one({"id": session_id}, {"_id": 0})
+    if not session:
+        raise HTTPException(status_code=404, detail="Sessão não encontrada")
+    
+    if session['user_id'] != current_user['user_id']:
+        raise HTTPException(status_code=403, detail="Acesso negado")
+    
+    if session['status'] != SessionStatus.IN_PROGRESS:
+        raise HTTPException(status_code=400, detail="Sessão não está em andamento")
+    
+    # Buscar sharks
+    sharks = await db.session_sharks.find({"session_id": session_id}, {"_id": 0}).to_list(10)
+    
+    # Carregar estado persistido
+    current_turn_count = session.get('turn_count', 0)
+    current_phase = session.get('phase', 'exploration')
+    current_session_phase = session.get('session_phase', 'PITCHING')
+    negotiation_state = session.get('negotiation_state', None)
+    
+    # Criar orquestrador
+    orchestrator = Orchestrator(
+        db, 
+        session_id, 
+        session['pitch'], 
+        sharks,
+        initial_turn_count=current_turn_count,
+        initial_phase=current_phase,
+        initial_session_phase=current_session_phase,
+        initial_negotiation_state=negotiation_state
+    )
+    
+    # Processar ação do founder
+    try:
+        response = await orchestrator.process_founder_action(action_request)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+    # Persistir estado atualizado
+    await db.sessions.update_one(
+        {"id": session_id},
+        {"$set": {
+            "turn_count": orchestrator.turn_count,
+            "phase": orchestrator.phase,
+            "session_phase": orchestrator.session_phase.value
+        }}
+    )
+    
+    return response
+
+# ============= OFFERS ENDPOINT =============
+
+@api_router.get("/sessions/{session_id}/offers", response_model=List[Offer])
+async def get_session_offers(
+    session_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Retorna ofertas ativas da sessão"""
+    session = await db.sessions.find_one({"id": session_id}, {"_id": 0})
+    if not session:
+        raise HTTPException(status_code=404, detail="Sessão não encontrada")
+    
+    if session['user_id'] != current_user['user_id']:
+        raise HTTPException(status_code=403, detail="Acesso negado")
+    
+    offers = await db.offers.find(
+        {"session_id": session_id, "status": OfferStatus.ACTIVE},
+        {"_id": 0}
+    ).to_list(10)
+    
+    return [Offer(**o) for o in offers]
 
 @api_router.get("/sessions/{session_id}/messages", response_model=List[MessageResponse])
 async def get_session_messages(
