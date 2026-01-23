@@ -69,6 +69,9 @@ class ReportGenerator:
         # 12. NOVO: Autópsia da sessão (análise profunda)
         autopsia = self._generate_autopsia(events, sharks, messages, offers, deals_closed, ending_type)
         
+        # 13. NOVO: "O QUE ACONTECERIA SE..." - Simulação contrafactual
+        contrafactual = self._generate_contrafactual(events, sharks, messages, offers, deals_closed, ending_type)
+        
         # Salvar relatório
         report_id = str(uuid.uuid4())
         generated_at = datetime.now(timezone.utc).isoformat()
@@ -88,6 +91,7 @@ class ReportGenerator:
             "avaliacao_idea": avaliacao_idea,
             "micro_sinais": micro_sinais,
             "autopsia": autopsia,
+            "contrafactual": contrafactual,
             "generated_at": generated_at
         }
         
