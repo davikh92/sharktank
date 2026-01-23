@@ -67,36 +67,44 @@ Construir uma aplicação web full-stack chamada "Investor Panel Simulator" que 
   - [x] Conflito entre sharks
   - [x] 4 finais cinematográficos
   - [x] Interface de negociação no frontend
-- [x] **RELATÓRIO COMO "AUTÓPSIA" (NOVO):**
+- [x] **RELATÓRIO COMO "AUTÓPSIA":**
   - [x] Micro-sinais não verbais (olhar relógio, anotar, cochichar, sorriso contido)
-  - [x] Análise profunda com perguntas-chave:
-    - "Qual foi o momento irreversível?"
-    - "Qual shark você perdeu primeiro — e por quê?"
-    - "O que você nunca respondeu de verdade?"
-    - "Onde você perdeu tração?"
-    - "Onde você ganhou respeito?"
-    - "Onde tomou risco desnecessário?"
-    - "Qual decisão matou o jogo?"
+  - [x] Análise profunda com perguntas-chave
   - [x] Avaliação Ideia vs Apresentação
   - [x] Pergunta provocativa final
   - [x] Linha do tempo da negociação
   - [x] Leitura individual de cada shark
+- [x] **BUG FIX: UI de sharks OUT** - Sharks agora aparecem visualmente como OUT quando saem
+- [x] **100+ VARIAÇÕES DE FRASES** - Cada arquétipo tem frases únicas no relatório
+- [x] **FINAIS CINEMATOGRÁFICOS VARIÁVEIS** - Múltiplas variações de veredito
+- [x] **NOVA PÁGINA "NOVA SESSÃO":**
+  - [x] 3 steps (Pitch → Painel → Revisar)
+  - [x] Indicador de "Força do Pitch" (0-100%)
+  - [x] Dicas contextuais para cada campo
+  - [x] Contagem de caracteres
+  - [x] Cálculo de valuation implícito
+  - [x] Lista do que sharks avaliam
 
-### 📋 Backlog (P1-P2)
+### 📋 Backlog (Próximas Tarefas)
 - [ ] **(P1)** Estados Granulares dos Sharks (`INTERESTED`, `WAITING_RESPONSE`, `NEGOTIATING`)
 - [ ] **(P2)** "Recusar exige justificativa" - modal com análise do LLM
-- [ ] **(P3)** Melhorar interface de eventos (interrupções, silêncios, ofertas visuais)
-- [ ] **(P4)** Integração real com Stripe (substituir fake paywall)
+- [ ] **(P3)** Recovery Window - janela de 1-2 turnos para "redenção" após primeiro OUT
+- [ ] **(P4)** Arco dramático do Operador - "última chance em 20 segundos"
+- [ ] **(P5)** "O QUE ACONTECERIA SE..." - simulação contrafactual no relatório
+- [ ] **(P6)** Estados de negociação implícitos - sinalizar tensão mesmo sem ofertas
+- [ ] **(P7)** Integração real com Stripe (substituir fake paywall)
 
 ## Arquivos de Referência
 - `/app/backend/server.py` - Rotas da API
 - `/app/backend/orchestrator.py` - Lógica do orquestrador
 - `/app/backend/negotiation_manager.py` - Sistema de negociação
-- `/app/backend/models.py` - Modelos de dados (incluindo novos para relatório)
-- `/app/backend/report_generator.py` - Geração de relatório com autópsia
-- `/app/frontend/src/pages/SessionRoom.js` - Interface da sessão (com negociação)
+- `/app/backend/models.py` - Modelos de dados
+- `/app/backend/report_generator.py` - Geração de relatório com autópsia e variações
+- `/app/frontend/src/pages/SessionRoom.js` - Interface da sessão (com sharksOutSet)
+- `/app/frontend/src/pages/NewSession.js` - Interface de nova sessão (3 steps)
 - `/app/frontend/src/pages/Report.js` - Interface do relatório (autópsia)
-- `/app/backend/tests/test_report_features.py` - Testes das novas features
+- `/app/backend/tests/test_new_features.py` - Testes das novas features
+- `/app/backend/tests/test_report_features.py` - Testes do relatório
 
 ## Credenciais de Teste
 - Email: `test@test.com`
