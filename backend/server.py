@@ -16,12 +16,13 @@ from models import (
     UserMessageSubmit, OrchestratorResponse,
     MessageResponse, EventResponse, ReportResponse,
     EventType, SessionSharkResponse, SessionPhase,
-    FounderActionRequest, Offer, OfferStatus
+    FounderActionRequest, Offer, OfferStatus, PitchEvaluation
 )
 from auth import hash_password, verify_password, create_access_token, get_current_user
 from shark_archetypes import get_all_archetypes, get_archetype_by_name
 from orchestrator import Orchestrator
 from report_generator import ReportGenerator
+from pitch_evaluator import PitchEvaluator, PitchScore
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
