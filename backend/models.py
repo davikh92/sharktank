@@ -15,6 +15,16 @@ class EventType(str, Enum):
     SHARK_COMMENT_LATERAL = "SHARK_COMMENT_LATERAL"
     SHARK_OUT = "SHARK_OUT"
     SHARK_OFFER = "SHARK_OFFER"
+    SHARK_OFFER_WITHDRAWN = "SHARK_OFFER_WITHDRAWN"
+    SHARK_OFFER_IMPROVED = "SHARK_OFFER_IMPROVED"
+    SHARK_CONFLICT = "SHARK_CONFLICT"
+    FOUNDER_ACCEPTED = "FOUNDER_ACCEPTED"
+    FOUNDER_REJECTED = "FOUNDER_REJECTED"
+    FOUNDER_COUNTERED = "FOUNDER_COUNTERED"
+    FOUNDER_WAITED = "FOUNDER_WAITED"
+    DEAL_CLOSED = "DEAL_CLOSED"
+    NEGOTIATION_STARTED = "NEGOTIATION_STARTED"
+    NEGOTIATION_ENDED = "NEGOTIATION_ENDED"
     SESSION_ENDED = "SESSION_ENDED"
     REPORT_GENERATED = "REPORT_GENERATED"
 
@@ -22,6 +32,37 @@ class SessionStatus(str, Enum):
     PENDING = "PENDING"
     IN_PROGRESS = "IN_PROGRESS"
     COMPLETED = "COMPLETED"
+
+# === NOVOS ENUMS PARA NEGOCIAÇÃO ===
+
+class SessionPhase(str, Enum):
+    PITCHING = "PITCHING"              # Perguntas normais
+    NEGOTIATION_WINDOW = "NEGOTIATION_WINDOW"  # Oferta na mesa, founder decide
+    CLOSING = "CLOSING"                # Encerramento
+
+class OfferType(str, Enum):
+    ALIGNED = "ALIGNED"      # Próximo do pedido (500k/10% → 500k/12%)
+    AGGRESSIVE = "AGGRESSIVE"  # Mesmo valor, mais equity (500k/25%)
+    CREATIVE = "CREATIVE"    # Valor diferente (300k/15% ou 700k/25%)
+
+class OfferStatus(str, Enum):
+    ACTIVE = "ACTIVE"
+    WITHDRAWN = "WITHDRAWN"
+    ACCEPTED = "ACCEPTED"
+    REJECTED = "REJECTED"
+    COUNTERED = "COUNTERED"
+
+class FounderAction(str, Enum):
+    ACCEPT = "ACCEPT"
+    REJECT = "REJECT"
+    COUNTER = "COUNTER"
+    WAIT = "WAIT"
+
+class EndingType(str, Enum):
+    DEAL_CLOSED = "DEAL_CLOSED"        # 🎉 Acordo fechado
+    DEAL_BITTER = "DEAL_BITTER"        # ⚖️ Acordo amargo
+    NO_DEAL = "NO_DEAL"                # ❌ Sem investimento
+    TABLE_BROKEN = "TABLE_BROKEN"      # 🔥 Mesa quebrada (tinha oferta, perdeu)
 
 class MessageType(str, Enum):
     PITCH = "PITCH"
@@ -31,6 +72,13 @@ class MessageType(str, Enum):
     INTERRUPTION = "INTERRUPTION"
     OUT_ANNOUNCEMENT = "OUT_ANNOUNCEMENT"
     OFFER = "OFFER"
+    OFFER_PRESSURE = "OFFER_PRESSURE"      # Shark pressionando por resposta
+    OFFER_WITHDRAWN = "OFFER_WITHDRAWN"    # Shark retirando oferta
+    COUNTER_OFFER = "COUNTER_OFFER"        # Founder fez contra-proposta
+    SHARK_REACTION = "SHARK_REACTION"      # Reação a ação do founder
+    SHARK_CONFLICT = "SHARK_CONFLICT"      # Sharks comentando ofertas entre si
+    DEAL_ANNOUNCEMENT = "DEAL_ANNOUNCEMENT"  # Anúncio de acordo
+    NARRATION = "NARRATION"                # Narração cinematográfica
 
 class UserRegister(BaseModel):
     email: EmailStr
