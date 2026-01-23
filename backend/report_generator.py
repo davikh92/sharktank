@@ -256,9 +256,6 @@ class ReportGenerator:
                 pitch_evaluation
             )
             
-            # Buscar perguntas feitas
-            questions = [m for m in messages if m.get('speaker') == archetype_name and m.get('message_type') == MessageType.QUESTION]
-            
             leitura_shark = {
                 "shark": archetype_name,
                 "o_que_buscava": self._get_shark_thesis(archetype_name),
