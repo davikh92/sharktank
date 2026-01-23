@@ -5,7 +5,7 @@ import time
 from datetime import datetime
 
 class InvestorPanelTester:
-    def __init__(self, base_url="https://pitch-arena.preview.emergentagent.com"):
+    def __init__(self, base_url="https://investor-sim.preview.emergentagent.com"):
         self.base_url = base_url
         self.api_url = f"{base_url}/api"
         self.token = None

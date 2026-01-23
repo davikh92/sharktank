@@ -5,7 +5,7 @@ import requests
 import time
 import os
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://pitch-arena.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://investor-sim.preview.emergentagent.com').rstrip('/')
 
 def test_shark_exit_with_generic_responses():
     """
