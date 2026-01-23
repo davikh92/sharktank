@@ -21,90 +21,91 @@ Construir uma aplicação web full-stack chamada "Investor Panel Simulator" que 
 ### Sistema de Negociação
 
 #### Tipos de Oferta
-- 🟢 **ALIGNED:** Próximo do pedido (500k/10% → 500k/12%)
-- 🟡 **AGGRESSIVE:** Mesmo valor, mais equity (500k/25%)
-- 🔵 **CREATIVE:** Valor diferente (300k/15% ou 700k/25%)
+- 🟢 **ALIGNED:** Próximo do pedido
+- 🟡 **AGGRESSIVE:** Mesmo valor, mais equity
+- 🔵 **CREATIVE:** Valor diferente
 
 #### Ações do Founder
-1. **ACCEPT** - Aceita a oferta (fecha deal)
-2. **REJECT** - Recusa (shark pode sair ou ficar)
-3. **COUNTER** - Contra-proposta (shark avalia)
-4. **WAIT** - Esperar outras ofertas (aumenta fadiga)
+1. **ACCEPT** - Aceita a oferta
+2. **REJECT** - Recusa
+3. **COUNTER** - Contra-proposta
+4. **WAIT** - Esperar
 
 #### Finais Cinematográficos
 - 🎉 **DEAL_CLOSED** - Acordo fechado
-- ⚖️ **DEAL_BITTER** - Acordo amargo (pagou caro)
-- 🔥 **TABLE_BROKEN** - Mesa quebrada (tinha oferta, perdeu)
+- ⚖️ **DEAL_BITTER** - Acordo amargo
+- 🔥 **TABLE_BROKEN** - Mesa quebrada
 - ❌ **NO_DEAL** - Sem investimento
-
-### Endpoints Principais
-- `POST /api/auth/register` - Registro de usuário
-- `POST /api/auth/login` - Login
-- `POST /api/sessions` - Criar sessão
-- `POST /api/sessions/{id}/start` - Iniciar sessão
-- `POST /api/sessions/{id}/respond` - Resposta do usuário
-- `POST /api/sessions/{id}/founder-action` - Ação do founder (negociação)
-- `GET /api/sessions/{id}/offers` - Ofertas ativas
-- `POST /api/sessions/{id}/report` - Gerar relatório
-- `GET /api/sessions/{id}/report` - Obter relatório
 
 ## O que foi implementado
 
 ### ✅ Concluído (Jan/2026)
+
+#### Core Features
 - [x] Autenticação completa (JWT)
 - [x] CRUD de sessões
-- [x] Interface completa (Landing, Auth, NewSession, SessionRoom, Report)
 - [x] Orquestrador com Modelo Híbrido
 - [x] Integração GPT-5.2
-- [x] Dinâmica de saídas de investidores
-- [x] BUG FIX: Persistência de turn_count e estado dos sharks entre turnos
-- [x] CALIBRAGEM: Validação dos 4 cenários de teste
-- [x] **SISTEMA DE NEGOCIAÇÃO COMPLETO:**
-  - [x] 3 tipos de oferta (Aligned, Aggressive, Creative)
-  - [x] 4 ações do founder (Accept, Reject, Counter, Wait)
-  - [x] Validade de ofertas (1-3 turnos)
-  - [x] Pressão de tempo
-  - [x] Conflito entre sharks
-  - [x] 4 finais cinematográficos
-  - [x] Interface de negociação no frontend
-- [x] **RELATÓRIO COMO "AUTÓPSIA":**
-  - [x] Micro-sinais não verbais (olhar relógio, anotar, cochichar, sorriso contido)
-  - [x] Análise profunda com perguntas-chave
-  - [x] Avaliação Ideia vs Apresentação
-  - [x] Pergunta provocativa final
-  - [x] Linha do tempo da negociação
-  - [x] Leitura individual de cada shark
-- [x] **BUG FIX: UI de sharks OUT** - Sharks agora aparecem visualmente como OUT quando saem
-- [x] **100+ VARIAÇÕES DE FRASES** - Cada arquétipo tem frases únicas no relatório
-- [x] **FINAIS CINEMATOGRÁFICOS VARIÁVEIS** - Múltiplas variações de veredito
-- [x] **NOVA PÁGINA "NOVA SESSÃO":**
-  - [x] 3 steps (Pitch → Painel → Revisar)
-  - [x] Indicador de "Força do Pitch" (0-100%)
-  - [x] Dicas contextuais para cada campo
-  - [x] Contagem de caracteres
-  - [x] Cálculo de valuation implícito
-  - [x] Lista do que sharks avaliam
+- [x] Sistema de negociação completo
+- [x] 4 finais cinematográficos
+
+#### Relatório como "Autópsia"
+- [x] Micro-sinais não verbais
+- [x] Análise profunda com perguntas-chave
+- [x] Avaliação Ideia vs Apresentação
+- [x] Pergunta provocativa final
+- [x] Linha do tempo da negociação
+- [x] Leitura individual de cada shark
+- [x] 100+ variações de frases por arquétipo
+
+#### Estados Granulares dos Sharks (NOVO)
+- [x] Estados: ATIVO, INTERESSADO, CÉTICO, IMPACIENTE, ÚLTIMA CHANCE, OUT
+- [x] Barra de interesse visual para cada shark
+- [x] Cores e ícones diferenciados por estado
+
+#### Recovery Window (NOVO)
+- [x] Janela de 1-2 turnos para "redenção" antes de sair
+- [x] Resposta "ultra objetiva + número concreto" pode salvar
+- [x] Não é proteção, é teste de resiliência
+
+#### Arco Dramático do Operador (NOVO)
+- [x] Sinaliza frustração antes de sair
+- [x] "Última chance em 20 segundos" antes da saída
+- [x] Aumenta tensão e sensação de "quase deu"
+
+#### "O QUE ACONTECERIA SE..." (NOVO)
+- [x] Simulações contrafactuais no relatório
+- [x] Não dá resposta pronta, só abre loop mental
+- [x] Hipóteses baseadas em eventos da sessão
+
+#### Guia de Entrada (NOVO)
+- [x] Integrado na Landing Page como seção expandível
+- [x] Explica o que é (e o que não é) o simulador
+- [x] Como o painel pensa
+- [x] Regras que não aparecem na tela
+- [x] O que acontece depois
+- [x] Aviso honesto
+
+#### Nova Página "Nova Sessão"
+- [x] 3 steps (Pitch → Painel → Revisar)
+- [x] Indicador de "Força do Pitch" (0-100%)
+- [x] Dicas contextuais para cada campo
+- [x] Contagem de caracteres
+- [x] Cálculo de valuation implícito
 
 ### 📋 Backlog (Próximas Tarefas)
-- [ ] **(P1)** Estados Granulares dos Sharks (`INTERESTED`, `WAITING_RESPONSE`, `NEGOTIATING`)
-- [ ] **(P2)** "Recusar exige justificativa" - modal com análise do LLM
-- [ ] **(P3)** Recovery Window - janela de 1-2 turnos para "redenção" após primeiro OUT
-- [ ] **(P4)** Arco dramático do Operador - "última chance em 20 segundos"
-- [ ] **(P5)** "O QUE ACONTECERIA SE..." - simulação contrafactual no relatório
-- [ ] **(P6)** Estados de negociação implícitos - sinalizar tensão mesmo sem ofertas
-- [ ] **(P7)** Integração real com Stripe (substituir fake paywall)
+- [ ] **(P1)** "Recusar exige justificativa" - modal com análise do LLM
+- [ ] **(P2)** Integração real com Stripe (substituir fake paywall)
 
 ## Arquivos de Referência
 - `/app/backend/server.py` - Rotas da API
-- `/app/backend/orchestrator.py` - Lógica do orquestrador
-- `/app/backend/negotiation_manager.py` - Sistema de negociação
-- `/app/backend/models.py` - Modelos de dados
-- `/app/backend/report_generator.py` - Geração de relatório com autópsia e variações
-- `/app/frontend/src/pages/SessionRoom.js` - Interface da sessão (com sharksOutSet)
-- `/app/frontend/src/pages/NewSession.js` - Interface de nova sessão (3 steps)
-- `/app/frontend/src/pages/Report.js` - Interface do relatório (autópsia)
-- `/app/backend/tests/test_new_features.py` - Testes das novas features
-- `/app/backend/tests/test_report_features.py` - Testes do relatório
+- `/app/backend/orchestrator.py` - Lógica do orquestrador (com Recovery Window)
+- `/app/backend/models.py` - Modelos de dados (com estados granulares)
+- `/app/backend/report_generator.py` - Geração de relatório (com contrafactual)
+- `/app/frontend/src/pages/Landing.js` - Landing page com guia expandível
+- `/app/frontend/src/pages/SessionRoom.js` - Sessão com estados granulares
+- `/app/frontend/src/pages/NewSession.js` - Nova sessão com 3 steps
+- `/app/frontend/src/pages/Report.js` - Relatório com autópsia e contrafactual
 
 ## Credenciais de Teste
 - Email: `test@test.com`
