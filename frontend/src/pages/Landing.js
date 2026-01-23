@@ -184,7 +184,7 @@ const Landing = () => {
                     <li>• ou nenhuma proposta</li>
                   </ul>
                   <p className="text-zinc-400 mt-4">Todas são respostas válidas do sistema.</p>
-                  <p className="text-white mt-4">O fracasso aqui não é "sair sem investimento".</p>
+                  <p className="text-white mt-4">O fracasso aqui não é &ldquo;sair sem investimento&rdquo;.</p>
                   <p className="text-red-400/80">O fracasso é não entender por que saiu.</p>
                 </GuideSection>
 
@@ -194,7 +194,7 @@ const Landing = () => {
                   <ul className="space-y-1 pl-4 text-zinc-500">
                     <li>• se você foi bem</li>
                     <li>• se foi mal</li>
-                    <li>• se "quase deu"</li>
+                    <li>• se &ldquo;quase deu&rdquo;</li>
                   </ul>
                   <p className="text-zinc-400 mt-4">Porque essa não é a pergunta certa.</p>
                   <p className="text-white mt-4">O que fica registrado é o comportamento da mesa.</p>
