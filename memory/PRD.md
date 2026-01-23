@@ -16,9 +16,9 @@ Construir uma aplicação web full-stack chamada "Investor Panel Simulator" que 
 2. Painel de 4 "sharks" (Operador, Financeiro, Cético, Visionário) interroga o usuário
 3. Backend orquestra a dinâmica (turnos, interrupções, saídas, OFERTAS)
 4. LLM gera falas dos investidores com base na intenção do orquestrador
-5. **NOVO:** Sistema de negociação com 4 ações do founder
+5. Sistema de negociação com 4 ações do founder
 
-### Sistema de Negociação (NOVO)
+### Sistema de Negociação
 
 #### Tipos de Oferta
 - 🟢 **ALIGNED:** Próximo do pedido (500k/10% → 500k/12%)
@@ -43,9 +43,10 @@ Construir uma aplicação web full-stack chamada "Investor Panel Simulator" que 
 - `POST /api/sessions` - Criar sessão
 - `POST /api/sessions/{id}/start` - Iniciar sessão
 - `POST /api/sessions/{id}/respond` - Resposta do usuário
-- `POST /api/sessions/{id}/founder-action` - **NOVO** Ação do founder (negociação)
-- `GET /api/sessions/{id}/offers` - **NOVO** Ofertas ativas
-- `GET /api/sessions/{id}/report` - Relatório final
+- `POST /api/sessions/{id}/founder-action` - Ação do founder (negociação)
+- `GET /api/sessions/{id}/offers` - Ofertas ativas
+- `POST /api/sessions/{id}/report` - Gerar relatório
+- `GET /api/sessions/{id}/report` - Obter relatório
 
 ## O que foi implementado
 
@@ -62,28 +63,44 @@ Construir uma aplicação web full-stack chamada "Investor Panel Simulator" que 
   - [x] 3 tipos de oferta (Aligned, Aggressive, Creative)
   - [x] 4 ações do founder (Accept, Reject, Counter, Wait)
   - [x] Validade de ofertas (1-3 turnos)
-  - [x] Pressão de tempo ("Minha oferta está na mesa agora")
+  - [x] Pressão de tempo
   - [x] Conflito entre sharks
   - [x] 4 finais cinematográficos
   - [x] Interface de negociação no frontend
+- [x] **RELATÓRIO COMO "AUTÓPSIA" (NOVO):**
+  - [x] Micro-sinais não verbais (olhar relógio, anotar, cochichar, sorriso contido)
+  - [x] Análise profunda com perguntas-chave:
+    - "Qual foi o momento irreversível?"
+    - "Qual shark você perdeu primeiro — e por quê?"
+    - "O que você nunca respondeu de verdade?"
+    - "Onde você perdeu tração?"
+    - "Onde você ganhou respeito?"
+    - "Onde tomou risco desnecessário?"
+    - "Qual decisão matou o jogo?"
+  - [x] Avaliação Ideia vs Apresentação
+  - [x] Pergunta provocativa final
+  - [x] Linha do tempo da negociação
+  - [x] Leitura individual de cada shark
 
 ### 📋 Backlog (P1-P2)
-- [ ] Melhorar Relatório Final (releitura comentada da sessão)
-- [ ] Integração real com Stripe (substituir fake paywall)
-- [ ] Refinamentos visuais na interface de eventos
-- [ ] Ajuste fino da avaliação da IDEIA vs APRESENTAÇÃO
+- [ ] **(P1)** Estados Granulares dos Sharks (`INTERESTED`, `WAITING_RESPONSE`, `NEGOTIATING`)
+- [ ] **(P2)** "Recusar exige justificativa" - modal com análise do LLM
+- [ ] **(P3)** Melhorar interface de eventos (interrupções, silêncios, ofertas visuais)
+- [ ] **(P4)** Integração real com Stripe (substituir fake paywall)
 
 ## Arquivos de Referência
 - `/app/backend/server.py` - Rotas da API
 - `/app/backend/orchestrator.py` - Lógica do orquestrador
-- `/app/backend/negotiation_manager.py` - **NOVO** Sistema de negociação
-- `/app/backend/models.py` - Modelos de dados
+- `/app/backend/negotiation_manager.py` - Sistema de negociação
+- `/app/backend/models.py` - Modelos de dados (incluindo novos para relatório)
+- `/app/backend/report_generator.py` - Geração de relatório com autópsia
 - `/app/frontend/src/pages/SessionRoom.js` - Interface da sessão (com negociação)
-- `/app/RELATORIO_CALIBRAGEM_FINAL.md` - Relatório de testes
+- `/app/frontend/src/pages/Report.js` - Interface do relatório (autópsia)
+- `/app/backend/tests/test_report_features.py` - Testes das novas features
 
 ## Credenciais de Teste
-- Email: `testfix@test.com`
-- Senha: `test123`
+- Email: `test@test.com`
+- Senha: `password`
 
 ## Notas
 - Sistema de pagamento é um "fake paywall" (MOCKED)
