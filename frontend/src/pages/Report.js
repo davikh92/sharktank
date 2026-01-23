@@ -388,6 +388,34 @@ const Report = () => {
             </section>
           )}
 
+          {/* CONTRAFACTUAL - "O QUE ACONTECERIA SE..." */}
+          {report.contrafactual && report.contrafactual.length > 0 && (
+            <section 
+              className="bg-zinc-900/50 border border-zinc-700 rounded-lg p-8"
+              data-testid="report-contrafactual"
+            >
+              <h2 className="text-2xl font-bold mb-2 text-white">
+                O Que Aconteceria Se...
+              </h2>
+              <p className="text-zinc-500 text-sm mb-6">
+                Simulações alternativas — não respostas, apenas perguntas
+              </p>
+              
+              <div className="space-y-6">
+                {report.contrafactual.map((item, idx) => (
+                  <div 
+                    key={idx}
+                    className="border-l-2 border-zinc-600 pl-4 py-2"
+                  >
+                    <p className="text-white font-medium mb-1">{item.hipotese}</p>
+                    <p className="text-zinc-400 text-sm mb-2">{item.consequencia}</p>
+                    <p className="text-zinc-500 text-xs italic">{item.reflexao}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
           {/* Pergunta Provocativa Final */}
           {report.pergunta_provocativa && (
             <section 
