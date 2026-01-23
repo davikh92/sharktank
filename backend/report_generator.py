@@ -286,31 +286,31 @@ class ReportGenerator:
         idea_vs_presentation = confianca_ideia - confianca_apresentacao
         
         if accepted:
-            return f"Vi potencial real aqui. O negócio faz sentido para o meu perfil e consegui entrar em termos que funcionam."
+            return "Vi potencial real aqui. O negócio faz sentido para o meu perfil e consegui entrar em termos que funcionam."
         
         if withdrawn:
-            return f"Fiz uma oferta, mas o founder hesitou demais. Quando a oportunidade passa, ela não volta."
+            return "Fiz uma oferta, mas o founder hesitou demais. Quando a oportunidade passa, ela não volta."
         
         if made_offer and not accepted:
-            return f"Eu estava disposto a investir, mas não chegamos a um acordo. Às vezes o timing não é o certo."
+            return "Eu estava disposto a investir, mas não chegamos a um acordo. Às vezes o timing não é o certo."
         
         if is_out:
             if interest < 30:
-                return f"Desde o início, não vi aderência à minha tese. O pitch não me convenceu do diferencial."
+                return "Desde o início, não vi aderência à minha tese. O pitch não me convenceu do diferencial."
             elif idea_vs_presentation > 15:
-                return f"A ideia tinha potencial, mas a apresentação não me deu confiança de que a execução seria boa."
+                return "A ideia tinha potencial, mas a apresentação não me deu confiança de que a execução seria boa."
             elif idea_vs_presentation < -15:
-                return f"Apresentou bem, mas a ideia em si não me pareceu defensável. Faltou diferencial real."
+                return "Apresentou bem, mas a ideia em si não me pareceu defensável. Faltou diferencial real."
             else:
-                return f"Não encontrei o que buscava. O risco não justificava o potencial que vi."
+                return "Não encontrei o que buscava. O risco não justificava o potencial que vi."
         
         # Permaneceu mas não ofertou
         if interest > 70:
-            return f"Vi potencial, mas ainda não estava convencido o suficiente para fazer uma oferta. Quase lá."
+            return "Vi potencial, mas ainda não estava convencido o suficiente para fazer uma oferta. Quase lá."
         elif interest > 50:
-            return f"Interessante, mas faltaram alguns elementos para eu me sentir confortável em investir."
+            return "Interessante, mas faltaram alguns elementos para eu me sentir confortável em investir."
         else:
-            return f"Acompanhei a sessão, mas o negócio não era para mim."
+            return "Acompanhei a sessão, mas o negócio não era para mim."
     
     def _get_shark_result(self, is_out: bool, made_offer: bool, accepted: bool, withdrawn: bool) -> str:
         """Retorna o resultado final do shark"""
