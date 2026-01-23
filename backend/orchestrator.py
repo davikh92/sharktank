@@ -521,13 +521,35 @@ class Orchestrator:
         # 7. Escolher shark para responder
         responding_shark = random.choice(active_sharks)
         
-        # 8. OFERTAS - Sharks com interesse muito alto fazem oferta (após turno 10)
-        if self.turn_count >= 10:
-            sharks_interessados = [s for s in active_sharks if s.state.interest > 70 and s.confianca > 60]
-            if sharks_interessados and random.random() < 0.25:  # 25% de chance
-                offering_shark = sharks_interessados[0]
-                offer_msg, offer_event = await self._generate_offer(offering_shark)
-                messages.append(offer_msg)
+        # 8. OFERTAS - Sistema melhorado de ofertas
+        # Após turno 8, sharks muito interessados podem fazer oferta
+        if self.turn_count >= 8:
+            sharks_interessados = [
+                s for s in active_sharks 
+                if s.state.interest >= 80 and s.confianca >= 50
+            ]
+            
+            if sharks_interessados:
+                # Probabilidade de oferta baseada no interesse
+                for shark in sharks_interessados:
+                    # Quanto maior o interesse, maior a chance
+                    base_prob = 0.20  # 20% base
+                    if shark.state.interest >= 90:
+                        base_prob = 0.35  # 35% para muito interessado
+                    if shark.state.interest >= 100:
+                        base_prob = 0.50  # 50% para máximo interesse
+                    
+                    # Multiplicador temporal (mais chances após turno 10)
+                    if self.turn_count >= 10:
+                        base_prob *= 1.3
+                    if self.turn_count >= 12:
+                        base_prob *= 1.2
+                    
+                    if random.random() < base_prob:
+                        offer_msg, offer_event = await self._generate_offer(shark)
+                        messages.append(offer_msg)
+                        events.append(offer_event)
+                        break  # Só uma oferta por turno
                 events.append(offer_event)
         
         # 9. Decidir tipo de resposta
