@@ -138,16 +138,22 @@ class SharkState(BaseModel):
     fadiga: float = 0.0      # Fadiga temporal
     response_memory_history: List[Dict[str, Any]] = []  # Histórico de respostas ponderadas
     conversation_memory: List[str] = []  # Histórico de conversa
-    # === NOVOS CAMPOS PARA NEGOCIAÇÃO ===
+    # === CAMPOS PARA NEGOCIAÇÃO ===
     has_active_offer: bool = False
     offer_id: Optional[str] = None
-    # === NOVOS CAMPOS PARA AVALIAÇÃO IDEIA vs APRESENTAÇÃO ===
+    # === CAMPOS PARA AVALIAÇÃO IDEIA vs APRESENTAÇÃO ===
     confianca_ideia: float = 50.0      # Baseado no pitch em si (piso)
     confianca_apresentacao: float = 50.0  # Baseado nas respostas
     initial_interest: float = 50.0     # Interesse inicial baseado na ideia
     saw_potential: bool = False        # Se "viu além" de apresentação ruim
     skepticism: str = "CONFIANTE"      # CONFIANTE, DESCONFIADO, CURIOSO
     shark_state_phase: str = "ACTIVE"  # ACTIVE, INTERESTED, OFFER_MADE, WAITING_RESPONSE, NEGOTIATING, DEAL_CLOSED, OUT
+    # === ESTADOS GRANULARES E RECOVERY WINDOW ===
+    display_state: str = "ACTIVE"       # Estado visual para UI
+    in_recovery_window: bool = False    # Se está em janela de recuperação
+    recovery_turns_remaining: int = 0   # Turnos restantes de recovery
+    last_chance_given: bool = False     # Se já deu "última chance" (Operador)
+    frustration_shown: bool = False     # Se já sinalizou frustração antes de sair
 
 # === MODELOS DE OFERTA ===
 
