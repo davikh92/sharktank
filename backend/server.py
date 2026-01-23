@@ -415,6 +415,7 @@ async def respond_to_session(
     current_phase = session.get('phase', 'exploration')
     current_session_phase = session.get('session_phase', 'PITCHING')
     negotiation_state = session.get('negotiation_state', None)
+    pitch_evaluation = session.get('pitch_evaluation', None)  # NOVO
     
     # Criar orquestrador COM estado existente
     orchestrator = Orchestrator(
@@ -425,7 +426,8 @@ async def respond_to_session(
         initial_turn_count=current_turn_count,
         initial_phase=current_phase,
         initial_session_phase=current_session_phase,
-        initial_negotiation_state=negotiation_state
+        initial_negotiation_state=negotiation_state,
+        pitch_evaluation=pitch_evaluation  # NOVO
     )
     
     # Processar resposta
