@@ -328,53 +328,94 @@ class SharkAgent:
             return random.random() < 0.30
         return random.random() < 0.15
         
-    def should_go_out(self, turn_count: int) -> bool:
+    def should_go_out(self, turn_count: int) -> Tuple[bool, Optional[str]]:
         """
         Decide se o shark deve sair
-        NUNCA 100% (exceto paciência crítica ou contradição grave)
+        Retorna: (should_exit, exit_type)
+        exit_type pode ser: None, "IMMEDIATE", "LAST_CHANCE", "FRUSTRATED_EXIT"
+        
+        RECOVERY WINDOW: Após primeira saída iminente, dá 1-2 turnos de última chance
+        ARCO DRAMÁTICO: Sinaliza frustração antes de sair
         """
         if self.state.is_out:
-            return False
+            return (False, None)
+        
+        # === SE ESTÁ EM RECOVERY WINDOW ===
+        if self.state.in_recovery_window:
+            self.state.recovery_turns_remaining -= 1
+            
+            # Resposta excelente salva o shark
+            recent_quality = self.response_memory.get_recent_trend(1)
+            if recent_quality > 0.5:
+                # Resposta boa! Sai do recovery
+                self.state.in_recovery_window = False
+                self.state.recovery_turns_remaining = 0
+                self.state.patience += 15  # Recupera um pouco
+                self.state.interest += 5
+                return (False, None)
+            
+            # Recovery expirou
+            if self.state.recovery_turns_remaining <= 0:
+                self.state.in_recovery_window = False
+                return (True, "FRUSTRATED_EXIT")
+            
+            # Ainda em recovery, não sai ainda
+            return (False, None)
         
         # PROTEÇÃO: Shark com interesse muito alto NÃO sai por exaustão
-        # Interesse > 80 = muito interessado, não vai desistir fácil
         if self.state.interest >= 80 and self.confianca >= 50:
-            # Só sai se paciência for CRÍTICA (< 5)
             if self.state.patience < 5:
-                return random.random() < 0.30  # Mesmo assim só 30%
-            return False
+                return (random.random() < 0.30, "IMMEDIATE")
+            return (False, None)
         
         # Primeiros 4 turnos: proteção
         if turn_count <= 4:
             if self.state.latent_decision == "OUT":
-                return random.random() < 0.15
-            return False
-        
-        # DETERMINÍSTICO: Apenas em casos EXTREMOS
-        # 1. Paciência crítica (< 5) E interesse baixo
-        if self.state.patience < 5 and self.state.interest < 60:
-            return True
-        
-        # 2. Contradição grave detectada recentemente
-        if self.confianca < 15 and self.state.latent_decision == "OUT":
-            return random.random() < 0.95  # 95%, não 100%
+                return (random.random() < 0.15, "IMMEDIATE")
+            return (False, None)
         
         # Calcular saúde composta
         health = self._calculate_health()
         
+        # === ARCO DRAMÁTICO DO OPERADOR: "Última chance" ===
+        if self.archetype['id'] == 'operador':
+            if not self.state.last_chance_given and health < 40 and self.state.latent_decision in ["OUT", "LEANING_OUT"]:
+                # Operador dá última chance antes de sair
+                self.state.last_chance_given = True
+                self.state.in_recovery_window = True
+                self.state.recovery_turns_remaining = 1  # 1 turno para se redimir
+                return (False, "LAST_CHANCE")
+        
+        # === RECOVERY WINDOW PARA OUTROS SHARKS ===
+        # Primeira vez que vai sair: dá janela de 2 turnos
+        if not self.state.frustration_shown and self.state.latent_decision == "OUT" and health < 35:
+            self.state.frustration_shown = True
+            self.state.in_recovery_window = True
+            self.state.recovery_turns_remaining = 2  # 2 turnos para se redimir
+            return (False, "LAST_CHANCE")
+        
+        # === SINALIZAR FRUSTRAÇÃO ANTES DE SAIR ===
+        if not self.state.frustration_shown and self.state.latent_decision == "LEANING_OUT" and health < 40:
+            self.state.frustration_shown = True
+            return (False, None)  # Não sai, mas frustração será comunicada
+        
+        # DETERMINÍSTICO: Apenas em casos EXTREMOS
+        if self.state.patience < 5 and self.state.interest < 60:
+            return (True, "IMMEDIATE")
+        
+        if self.confianca < 15 and self.state.latent_decision == "OUT":
+            return (random.random() < 0.95, "FRUSTRATED_EXIT")
+        
         # Decisão OUT: alta probabilidade mas não garantida
         if self.state.latent_decision == "OUT":
-            # 90-95% dependendo da saúde
             prob = 0.90 if health > 15 else 0.95
-            return random.random() < prob
+            return (random.random() < prob, "FRUSTRATED_EXIT")
         
         # LEANING_OUT: probabilidade cresce com tempo
         if self.state.latent_decision == "LEANING_OUT":
-            # PROTEÇÃO ADICIONAL: interesse alto reduz chance
             if self.state.interest >= 70:
-                return random.random() < 0.10  # Só 10% de sair
+                return (random.random() < 0.10, "IMMEDIATE")
             
-            # Base depende de saúde
             if health < 20:
                 base_prob = 0.65
             elif health < 35:
@@ -382,25 +423,22 @@ class SharkAgent:
             else:
                 base_prob = 0.35
             
-            # Pattern score influencia
             pattern_score = self.response_memory.get_pattern_score()
             if pattern_score < -2.0:
                 base_prob *= 1.4
             elif pattern_score > 2.0:
                 base_prob *= 0.7
             
-            # Multiplicador temporal (após turno 10)
             if turn_count >= 10:
                 time_mult = 1.3
                 if turn_count >= 14:
                     time_mult = 1.6
                 base_prob *= time_mult
             
-            # Nunca 100%
             base_prob = min(0.92, base_prob)
-            return random.random() < base_prob
+            return (random.random() < base_prob, "FRUSTRATED_EXIT")
         
-        return False
+        return (False, None)
 
     async def generate_speech(self, intent: str, context: str) -> str:
         """Gera a fala do shark usando LLM"""
