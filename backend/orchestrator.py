@@ -1,12 +1,15 @@
 import random
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime, timezone
 import uuid
 from models import (
     EventType, MessageType, SessionStatus, SharkState,
-    MessageResponse, EventResponse, OrchestratorResponse
+    MessageResponse, EventResponse, OrchestratorResponse,
+    SessionPhase, Offer, OfferType, OfferStatus, FounderAction,
+    EndingType, NegotiationState, CounterOffer, FounderActionRequest
 )
 from shark_archetypes import get_archetype_by_id
+from negotiation_manager import NegotiationManager
 import os
 from dotenv import load_dotenv
 from emergentintegrations.llm.chat import LlmChat, UserMessage
