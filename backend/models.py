@@ -212,6 +212,11 @@ class OrchestratorResponse(BaseModel):
     session_status: SessionStatus
     can_user_respond: bool
     reading_hint: Optional[str] = None
+    # === NOVOS CAMPOS PARA NEGOCIAÇÃO ===
+    session_phase: SessionPhase = SessionPhase.PITCHING
+    active_offers: List[Offer] = []
+    awaiting_founder_action: bool = False  # True quando há oferta ativa esperando decisão
+    ending: Optional[Dict[str, Any]] = None  # Info do final cinematográfico
 
 class ReportSection(BaseModel):
     titulo: str
