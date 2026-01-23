@@ -76,6 +76,8 @@ class SharkState(BaseModel):
     silent_turns: int = 0
     confianca: float = 50.0  # Confiança implícita
     fadiga: float = 0.0      # Fadiga temporal
+    response_memory_history: List[Dict[str, Any]] = []  # Histórico de respostas ponderadas
+    conversation_memory: List[str] = []  # Histórico de conversa
 
 class SessionSharkResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
