@@ -400,13 +400,35 @@ class Orchestrator:
         pitch_data: Dict[str, Any], 
         sharks_data: List[Dict[str, Any]],
         initial_turn_count: int = 0,
-        initial_phase: str = "exploration"
+        initial_phase: str = "exploration",
+        initial_session_phase: str = "PITCHING",
+        initial_negotiation_state: Optional[Dict] = None
     ):
         self.db = db
         self.session_id = session_id
         self.pitch_data = pitch_data
         self.turn_count = initial_turn_count  # CARREGA do banco, não começa do zero
         self.phase = initial_phase  # CARREGA do banco
+        
+        # === SISTEMA DE NEGOCIAÇÃO ===
+        self.session_phase = SessionPhase(initial_session_phase) if initial_session_phase else SessionPhase.PITCHING
+        self.negotiation_manager = NegotiationManager(db, session_id, pitch_data)
+        
+        # Estado de negociação
+        if initial_negotiation_state:
+            self.negotiation_state = NegotiationState(**initial_negotiation_state)
+        else:
+            self.negotiation_state = NegotiationState()
+        
+        # Ofertas ativas (carregadas do banco)
+        self.active_offers: List[Offer] = []
+        
+        # Deals fechados
+        self.deals_closed: List[Dict] = []
+        
+        # Contadores para final
+        self.total_offers_made = 0
+        self.total_offers_withdrawn = 0
         
         # Criar agentes dos sharks
         self.sharks: List[SharkAgent] = []
@@ -422,6 +444,23 @@ class Orchestrator:
                 
                 agent = SharkAgent(shark_data['shark_id'], archetype, session_context, initial_state)
                 self.sharks.append(agent)
+    
+    async def load_active_offers(self):
+        """Carrega ofertas ativas do banco"""
+        offers_data = await self.db.offers.find(
+            {"session_id": self.session_id, "status": "ACTIVE"},
+            {"_id": 0}
+        ).to_list(10)
+        
+        self.active_offers = [Offer(**o) for o in offers_data]
+    
+    async def save_offer(self, offer: Offer):
+        """Salva oferta no banco"""
+        await self.db.offers.update_one(
+            {"id": offer.id},
+            {"$set": offer.model_dump()},
+            upsert=True
+        )
     
     def analyze_answer_quality(self, answer: str) -> Dict[str, Any]:
         """Análise aprimorada da qualidade da resposta"""
