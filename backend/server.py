@@ -284,17 +284,28 @@ async def start_session(
     if session['user_id'] != current_user['user_id']:
         raise HTTPException(status_code=403, detail="Acesso negado")
     
-    # Atualizar status para IN_PROGRESS
+    # Atualizar status para IN_PROGRESS e inicializar turn_count e phase
     await db.sessions.update_one(
         {"id": session_id},
-        {"$set": {"status": SessionStatus.IN_PROGRESS}}
+        {"$set": {
+            "status": SessionStatus.IN_PROGRESS,
+            "turn_count": 0,
+            "phase": "exploration"
+        }}
     )
     
     # Buscar sharks
     sharks = await db.session_sharks.find({"session_id": session_id}, {"_id": 0}).to_list(10)
     
     # Criar orquestrador
-    orchestrator = Orchestrator(db, session_id, session['pitch'], sharks)
+    orchestrator = Orchestrator(
+        db, 
+        session_id, 
+        session['pitch'], 
+        sharks,
+        initial_turn_count=0,
+        initial_phase="exploration"
+    )
     
     # Gerar primeira pergunta de um shark aleatório
     first_shark = random.choice(orchestrator.sharks)
