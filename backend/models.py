@@ -126,6 +126,47 @@ class SharkState(BaseModel):
     fadiga: float = 0.0      # Fadiga temporal
     response_memory_history: List[Dict[str, Any]] = []  # Histórico de respostas ponderadas
     conversation_memory: List[str] = []  # Histórico de conversa
+    # === NOVOS CAMPOS PARA NEGOCIAÇÃO ===
+    has_active_offer: bool = False
+    offer_id: Optional[str] = None
+
+# === MODELOS DE OFERTA ===
+
+class Offer(BaseModel):
+    """Representa uma oferta de um shark"""
+    id: str
+    shark_id: str
+    shark_name: str
+    session_id: str
+    offer_type: OfferType
+    valor: str           # Ex: "R$ 500.000"
+    equity: str          # Ex: "15%"
+    conditions: Optional[str] = None  # Condições especiais
+    status: OfferStatus = OfferStatus.ACTIVE
+    turns_remaining: int = 2  # Validade em turnos (1-3)
+    created_at_turn: int
+    withdrawn_at_turn: Optional[int] = None
+
+class CounterOffer(BaseModel):
+    """Contra-proposta do founder"""
+    offer_id: str  # ID da oferta original
+    valor: str
+    equity: str
+    message: Optional[str] = None
+
+class FounderActionRequest(BaseModel):
+    """Ação do founder em resposta a uma oferta"""
+    action: FounderAction
+    offer_id: str  # ID da oferta alvo
+    counter_offer: Optional[CounterOffer] = None  # Se action == COUNTER
+
+class NegotiationState(BaseModel):
+    """Estado da janela de negociação"""
+    is_active: bool = False
+    active_offers: List[Offer] = []
+    deals_closed: List[Dict[str, Any]] = []
+    turns_in_negotiation: int = 0
+    ending_type: Optional[EndingType] = None
 
 class SessionSharkResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
