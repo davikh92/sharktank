@@ -616,18 +616,102 @@ class ReportGenerator:
         return pontos
     
     def _generate_veredito(self, sharks: List[Dict], deals: List[Dict], ending_type: str) -> str:
-        """Gera veredito final"""
+        """Gera veredito final com variações cinematográficas"""
+        sharks_out = len([s for s in sharks if s.get('is_out', False)])
+        offer_events_count = sum(1 for s in sharks if s.get('state', {}).get('has_active_offer', False))
+        
+        # Calcular média de interesse
+        avg_interest = sum(s.get('state', {}).get('interest', 50) for s in sharks) / len(sharks) if sharks else 50
+        
+        # Calcular média de confiança na ideia vs apresentação
+        avg_idea = sum(s.get('state', {}).get('confianca_ideia', 50) for s in sharks) / len(sharks) if sharks else 50
+        avg_apresentacao = sum(s.get('state', {}).get('confianca_apresentacao', 50) for s in sharks) / len(sharks) if sharks else 50
+        
         if deals:
-            return f"Sessão encerrada com {len(deals)} acordo(s) fechado(s)."
+            deal_verdicts = [
+                f"Deal fechado com {len(deals)} investidor(es). A mesa comprou.",
+                f"Acordo selado. {len(deals)} investidor(es) viram o que buscavam.",
+                "A negociação funcionou. Saiu com investimento no bolso."
+            ]
+            return random.choice(deal_verdicts)
         
         if ending_type == 'TABLE_BROKEN':
-            return "Mesa quebrada. Houve interesse, mas as decisões do founder custaram caro."
+            broken_verdicts = [
+                "Mesa quebrada. Havia dinheiro na mesa, mas a indecisão custou tudo.",
+                "Ofertas existiram. Decisão não. A oportunidade evaporou.",
+                "O painel estava disposto. O founder não estava pronto."
+            ]
+            return random.choice(broken_verdicts)
         
-        sharks_out = len([s for s in sharks if s.get('is_out', False)])
+        if ending_type == 'DEAL_BITTER':
+            bitter_verdicts = [
+                "Deal fechado, mas a um preço alto. Às vezes vencer custa caro.",
+                "Acordo feito, mas com gosto amargo. Pagou-se o preço da hesitação.",
+                "Investimento garantido, mas em termos desfavoráveis."
+            ]
+            return random.choice(bitter_verdicts)
+        
+        # NO_DEAL com variações baseadas no contexto
         if sharks_out == len(sharks):
-            return "Nenhum investidor manteve interesse até o final."
+            # Todos saíram
+            if avg_idea > 60:
+                all_out_verdicts = [
+                    "O painel não comprou — mas a ideia tinha mérito. A apresentação não convenceu.",
+                    "Ideia interessante, founder não preparado. A mesa esvaziou.",
+                    "Potencial reconhecido, confiança não construída. Todos saíram."
+                ]
+            elif avg_interest < 30:
+                all_out_verdicts = [
+                    "A mesa não viu fit. Simples assim.",
+                    "Não era o deal certo para esse painel.",
+                    "O pitch não encontrou audiência. Nenhum investidor permaneceu."
+                ]
+            else:
+                all_out_verdicts = [
+                    "O painel ouviu, questionou, e decidiu passar.",
+                    "Sem alinhamento de visão. A mesa se esvaziou.",
+                    "Quatro investidores, zero ofertas. O mercado falou."
+                ]
+            return random.choice(all_out_verdicts)
         
-        return f"{len(sharks) - sharks_out} de {len(sharks)} investidores mantiveram interesse."
+        elif sharks_out > 0:
+            # Alguns saíram
+            remaining = len(sharks) - sharks_out
+            if avg_apresentacao < avg_idea - 10:
+                partial_verdicts = [
+                    f"A ideia tinha potencial, mas {sharks_out} investidor(es) perderam confiança na execução.",
+                    f"{remaining} permaneceu(ram), mas sem convicção para ofertar. Apresentação matou a ideia.",
+                    "O conceito interessou, a defesa não convenceu."
+                ]
+            elif offer_events_count > 0:
+                partial_verdicts = [
+                    f"Houve interesse, quase houve deal. {remaining} ficou(aram) na dúvida.",
+                    "A mesa esquentou, mas não fechou. Quase lá.",
+                    "Ofertas quase aconteceram. O 'quase' é o pior resultado."
+                ]
+            else:
+                partial_verdicts = [
+                    f"{sharks_out} investidor(es) saiu(ram). {remaining} permaneceu(ram) observando.",
+                    "Interesse parcial, compromisso nenhum.",
+                    f"O painel se dividiu. {sharks_out} desistiu(ram), {remaining} hesitou(aram)."
+                ]
+            return random.choice(partial_verdicts)
+        
+        else:
+            # Ninguém saiu mas não houve deal
+            if avg_interest > 60:
+                no_exit_verdicts = [
+                    "Todos permaneceram interessados, mas ninguém puxou o gatilho.",
+                    "Alto interesse, zero ação. Faltou o empurrão final.",
+                    "A mesa estava engajada, mas não convicta o suficiente."
+                ]
+            else:
+                no_exit_verdicts = [
+                    "O painel acompanhou por educação. Interesse morno.",
+                    "Sessão morna. Ninguém saiu, ninguém ofertou.",
+                    "Atenção sem entusiasmo. O painel observou, apenas."
+                ]
+            return random.choice(no_exit_verdicts)
     
     def _identify_turning_point(self, events: List[Dict], sharks: List[Dict], offers: List[Dict]) -> Dict[str, Any]:
         """Identifica quando a mesa virou"""
