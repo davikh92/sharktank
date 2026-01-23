@@ -15,7 +15,8 @@ from models import (
     SessionCreate, SessionResponse, SessionStatus, SharkState,
     UserMessageSubmit, OrchestratorResponse,
     MessageResponse, EventResponse, ReportResponse,
-    EventType, SessionSharkResponse
+    EventType, SessionSharkResponse, SessionPhase,
+    FounderActionRequest, Offer, OfferStatus
 )
 from auth import hash_password, verify_password, create_access_token, get_current_user
 from shark_archetypes import get_all_archetypes, get_archetype_by_name
