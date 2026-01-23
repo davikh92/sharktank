@@ -64,6 +64,13 @@ export const getSessionMessages = (sessionId) =>
 export const getSessionEvents = (sessionId) => 
   apiClient.get(`/sessions/${sessionId}/events`);
 
+// Negotiation
+export const founderAction = (sessionId, actionData) => 
+  apiClient.post(`/sessions/${sessionId}/founder-action`, actionData);
+
+export const getSessionOffers = (sessionId) => 
+  apiClient.get(`/sessions/${sessionId}/offers`);
+
 // Reports
 export const generateReport = (sessionId) => 
   apiClient.post(`/sessions/${sessionId}/report`);
