@@ -12,7 +12,7 @@ import os
 import time
 import uuid
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://investor-sim.preview.emergentagent.com').rstrip('/')
 
 class TestReportFeatures:
     """Test the new report features: micro-sinais, autopsia, avaliacao_idea"""
