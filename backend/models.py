@@ -64,6 +64,18 @@ class EndingType(str, Enum):
     NO_DEAL = "NO_DEAL"                # ❌ Sem investimento
     TABLE_BROKEN = "TABLE_BROKEN"      # 🔥 Mesa quebrada (tinha oferta, perdeu)
 
+# === NOVOS ESTADOS GRANULARES DOS SHARKS ===
+class SharkDisplayState(str, Enum):
+    ACTIVE = "ACTIVE"                   # ● Neutro, aguardando
+    INTERESTED = "INTERESTED"           # 👀 Interesse alto (> 70)
+    SKEPTICAL = "SKEPTICAL"             # 🤨 Ceticismo (interesse < 40)
+    WAITING_RESPONSE = "WAITING_RESPONSE"  # ⏳ Fez pergunta, aguarda resposta
+    OFFER_MADE = "OFFER_MADE"           # 💰 Fez oferta ativa
+    NEGOTIATING = "NEGOTIATING"         # 🤝 Em negociação
+    LOSING_PATIENCE = "LOSING_PATIENCE" # ⚠️ Perdendo paciência
+    LAST_CHANCE = "LAST_CHANCE"         # ⏱️ Última chance (Recovery Window)
+    OUT = "OUT"                         # ✗ Saiu
+
 class MessageType(str, Enum):
     PITCH = "PITCH"
     QUESTION = "QUESTION"
