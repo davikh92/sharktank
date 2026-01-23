@@ -104,7 +104,7 @@ const Report = () => {
             data-testid="report-sintese"
           >
             <p className="text-xl text-gray-200 leading-relaxed" style={{ fontFamily: "'Cormorant Garamond', serif" }}>
-              "{report.sintese}"
+              &ldquo;{report.sintese}&rdquo;
             </p>
           </section>
 
