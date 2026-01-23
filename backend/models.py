@@ -119,16 +119,23 @@ class SharkState(BaseModel):
     patience: float = 100.0  # 0-100
     trust_founder: float = 50.0  # 0-100
     risk_appetite: float = 50.0  # 0-100
-    latent_decision: str = "ACTIVE"  # ACTIVE, LEANING_OUT, OUT
+    latent_decision: str = "ACTIVE"  # ACTIVE, INTERESTED, LEANING_OUT, OUT
     is_out: bool = False
     silent_turns: int = 0
-    confianca: float = 50.0  # Confiança implícita
+    confianca: float = 50.0  # Confiança geral (legado)
     fadiga: float = 0.0      # Fadiga temporal
     response_memory_history: List[Dict[str, Any]] = []  # Histórico de respostas ponderadas
     conversation_memory: List[str] = []  # Histórico de conversa
     # === NOVOS CAMPOS PARA NEGOCIAÇÃO ===
     has_active_offer: bool = False
     offer_id: Optional[str] = None
+    # === NOVOS CAMPOS PARA AVALIAÇÃO IDEIA vs APRESENTAÇÃO ===
+    confianca_ideia: float = 50.0      # Baseado no pitch em si (piso)
+    confianca_apresentacao: float = 50.0  # Baseado nas respostas
+    initial_interest: float = 50.0     # Interesse inicial baseado na ideia
+    saw_potential: bool = False        # Se "viu além" de apresentação ruim
+    skepticism: str = "CONFIANTE"      # CONFIANTE, DESCONFIADO, CURIOSO
+    shark_state_phase: str = "ACTIVE"  # ACTIVE, INTERESTED, OFFER_MADE, WAITING_RESPONSE, NEGOTIATING, DEAL_CLOSED, OUT
 
 # === MODELOS DE OFERTA ===
 
