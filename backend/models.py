@@ -316,6 +316,13 @@ class MicroSinal(BaseModel):
     sinal: str  # Ex: "olhou o relógio", "anotou algo", "sorriso contido"
     traducao_psicologica: str  # Ex: "Perdi interesse", "Isso importa"
 
+# === MODELO DE CONTRAFACTUAL ===
+class ContrafactualItem(BaseModel):
+    """Item de simulação contrafactual - 'O que aconteceria se...'"""
+    hipotese: str
+    consequencia: str
+    reflexao: str
+
 class ReportResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str
@@ -334,4 +341,6 @@ class ReportResponse(BaseModel):
     # === NOVOS CAMPOS DA "AUTÓPSIA" ===
     autopsia: Optional[Dict[str, Any]] = None  # AutopsiaAnalise como dict
     micro_sinais: Optional[List[Dict[str, Any]]] = None  # Lista de MicroSinal
+    # === CONTRAFACTUAL - "O QUE ACONTECERIA SE..." ===
+    contrafactual: Optional[List[Dict[str, str]]] = None  # Lista de ContrafactualItem
     generated_at: str
