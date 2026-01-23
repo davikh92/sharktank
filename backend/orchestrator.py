@@ -627,12 +627,32 @@ class Orchestrator:
         if not active_sharks:
             return await self._end_session_with_negotiation(messages, events)
         
-        # 7. VERIFICAR SAÍDAS AUTOMÁTICAS
+        # 7. VERIFICAR SAÍDAS AUTOMÁTICAS E RECOVERY WINDOW
         for shark in active_sharks[:]:
-            if shark.should_go_out(self.turn_count):
+            should_exit, exit_type = shark.should_go_out(self.turn_count)
+            
+            # Atualizar display_state do shark
+            shark.state.display_state = shark.get_display_state(
+                has_active_offer=shark.state.has_active_offer,
+                is_negotiating=self.session_phase == SessionPhase.NEGOTIATION_WINDOW,
+                just_asked_question=False
+            )
+            
+            if exit_type == "LAST_CHANCE":
+                # Shark sinalizou "última chance" - gerar mensagem especial
+                last_chance_msg = await self._generate_last_chance_warning(shark)
+                messages.append(last_chance_msg)
+                events.append(EventResponse(
+                    id=str(uuid.uuid4()),
+                    event_type=EventType.SHARK_SILENT,  # Usando como proxy
+                    actor=shark.archetype['name'],
+                    data={"type": "LAST_CHANCE", "recovery_turns": shark.state.recovery_turns_remaining},
+                    timestamp=datetime.now(timezone.utc).isoformat()
+                ))
+            elif should_exit:
                 # Se shark tinha oferta ativa, retirar antes de sair
                 await self._withdraw_offer_if_exists(shark, messages, events)
-                out_msg, out_event = await self._generate_out(shark)
+                out_msg, out_event = await self._generate_out(shark, exit_type)
                 messages.append(out_msg)
                 events.append(out_event)
         
