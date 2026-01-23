@@ -402,13 +402,19 @@ class Orchestrator:
         initial_turn_count: int = 0,
         initial_phase: str = "exploration",
         initial_session_phase: str = "PITCHING",
-        initial_negotiation_state: Optional[Dict] = None
+        initial_negotiation_state: Optional[Dict] = None,
+        pitch_evaluation: Optional[Dict] = None  # NOVO
     ):
         self.db = db
         self.session_id = session_id
         self.pitch_data = pitch_data
         self.turn_count = initial_turn_count  # CARREGA do banco, não começa do zero
         self.phase = initial_phase  # CARREGA do banco
+        
+        # === AVALIAÇÃO DO PITCH (IDEIA vs APRESENTAÇÃO) ===
+        self.pitch_evaluation = pitch_evaluation or {}
+        self.offer_probability_multiplier = self.pitch_evaluation.get('offer_probability_multiplier', 0.6)
+        self.idea_tier = self.pitch_evaluation.get('idea_tier', 'MEDIANA')
         
         # === SISTEMA DE NEGOCIAÇÃO ===
         self.session_phase = SessionPhase(initial_session_phase) if initial_session_phase else SessionPhase.PITCHING
