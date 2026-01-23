@@ -297,6 +297,14 @@ class SharkAgent:
         if self.state.is_out:
             return False
         
+        # PROTEÇÃO: Shark com interesse muito alto NÃO sai por exaustão
+        # Interesse > 80 = muito interessado, não vai desistir fácil
+        if self.state.interest >= 80 and self.confianca >= 50:
+            # Só sai se paciência for CRÍTICA (< 5)
+            if self.state.patience < 5:
+                return random.random() < 0.30  # Mesmo assim só 30%
+            return False
+        
         # Primeiros 4 turnos: proteção
         if turn_count <= 4:
             if self.state.latent_decision == "OUT":
@@ -304,8 +312,8 @@ class SharkAgent:
             return False
         
         # DETERMINÍSTICO: Apenas em casos EXTREMOS
-        # 1. Paciência crítica (< 5)
-        if self.state.patience < 5:
+        # 1. Paciência crítica (< 5) E interesse baixo
+        if self.state.patience < 5 and self.state.interest < 60:
             return True
         
         # 2. Contradição grave detectada recentemente
@@ -323,6 +331,10 @@ class SharkAgent:
         
         # LEANING_OUT: probabilidade cresce com tempo
         if self.state.latent_decision == "LEANING_OUT":
+            # PROTEÇÃO ADICIONAL: interesse alto reduz chance
+            if self.state.interest >= 70:
+                return random.random() < 0.10  # Só 10% de sair
+            
             # Base depende de saúde
             if health < 20:
                 base_prob = 0.65
