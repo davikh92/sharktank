@@ -336,7 +336,7 @@ class ReportGenerator:
         sinais = []
         
         interruptions = len([e for e in events if e.get('event_type') == EventType.PITCH_INTERRUPTED])
-        silences = len([e for e in events if e.get('event_type') == EventType.SHARK_SILENT])
+        silences_count = len([e for e in events if e.get('event_type') == EventType.SHARK_SILENT])
         outs = len([e for e in events if e.get('event_type') == EventType.SHARK_OUT])
         evasive_answers = len([e for e in events if e.get('event_type') == EventType.ANSWER_EVASIVE])
         offers = len([e for e in events if e.get('event_type') == EventType.SHARK_OFFER])
@@ -348,6 +348,8 @@ class ReportGenerator:
             sinais.append(f"Houve tensão entre os investidores ({conflicts} conflito(s))")
         if interruptions > 2:
             sinais.append(f"Múltiplas interrupções ({interruptions}x) indicam impaciência")
+        if silences_count > 2:
+            sinais.append(f"Silêncios prolongados ({silences_count}x) indicam desinteresse")
         if evasive_answers > 1:
             sinais.append(f"Respostas evasivas ({evasive_answers}x) reduziram confiança da mesa")
         if outs > 2:
