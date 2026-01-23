@@ -17,7 +17,7 @@ import os
 import time
 import uuid
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://investor-sim.preview.emergentagent.com').rstrip('/')
 
 # Test credentials
 TEST_EMAIL = f"test_turn_{uuid.uuid4().hex[:8]}@test.com"
