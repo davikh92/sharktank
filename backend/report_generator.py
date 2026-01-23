@@ -521,3 +521,262 @@ class ReportGenerator:
                 "modelo_negocio": pitch_evaluation.get('modelo_negocio', 50)
             }
         }
+
+
+    def _generate_micro_sinais(self, events: List[Dict], sharks: List[Dict], messages: List[Dict]) -> List[Dict[str, Any]]:
+        """
+        Gera micro-sinais não verbais baseados nos eventos da sessão.
+        Sem texto explicativo, apenas descrição narrativa curta.
+        """
+        micro_sinais = []
+        turno = 0
+        
+        # Mapear eventos para micro-sinais comportamentais
+        for event in events:
+            event_type = event.get('event_type', '')
+            actor = event.get('actor', '')
+            data = event.get('data', {})
+            
+            if event_type == EventType.QUESTION_ASKED:
+                turno += 1
+            
+            # Shark ficou em silêncio
+            if event_type == EventType.SHARK_SILENT:
+                micro_sinais.append({
+                    "turno": turno,
+                    "shark": actor,
+                    "sinal": "ficou em silêncio, olhando para os papéis",
+                    "traducao_psicologica": "Resposta insuficiente"
+                })
+            
+            # Shark saiu
+            elif event_type == EventType.SHARK_OUT:
+                micro_sinais.append({
+                    "turno": turno,
+                    "shark": actor,
+                    "sinal": "olhou o relógio, fechou a pasta e recostou na cadeira",
+                    "traducao_psicologica": "Perdi interesse"
+                })
+            
+            # Shark fez oferta
+            elif event_type == EventType.SHARK_OFFER:
+                micro_sinais.append({
+                    "turno": turno,
+                    "shark": actor,
+                    "sinal": "inclinou-se para frente, anotando algo rapidamente",
+                    "traducao_psicologica": "Isso importa"
+                })
+            
+            # Shark retirou oferta
+            elif event_type == EventType.SHARK_OFFER_WITHDRAWN:
+                micro_sinais.append({
+                    "turno": turno,
+                    "shark": actor,
+                    "sinal": "cruzou os braços e balançou a cabeça levemente",
+                    "traducao_psicologica": "Oportunidade perdida"
+                })
+            
+            # Conflito entre sharks
+            elif event_type == EventType.SHARK_CONFLICT:
+                target = data.get('target_shark', '')
+                micro_sinais.append({
+                    "turno": turno,
+                    "shark": actor,
+                    "sinal": f"trocou olhares com {target}, sorriso contido",
+                    "traducao_psicologica": "Avaliação paralela"
+                })
+            
+            # Resposta evasiva detectada
+            elif event_type == EventType.ANSWER_EVASIVE:
+                # Adicionar reação de um shark aleatório que não saiu
+                active_sharks = [s for s in sharks if not s.get('is_out', False)]
+                if active_sharks:
+                    random_shark = random.choice(active_sharks)
+                    micro_sinais.append({
+                        "turno": turno,
+                        "shark": random_shark.get('archetype_name', 'Investidor'),
+                        "sinal": "franziu a testa e fez uma anotação",
+                        "traducao_psicologica": "Resposta não convenceu"
+                    })
+            
+            # Pitch interrompido
+            elif event_type == EventType.PITCH_INTERRUPTED:
+                micro_sinais.append({
+                    "turno": turno,
+                    "shark": actor,
+                    "sinal": "levantou a mão, interrompendo",
+                    "traducao_psicologica": "Preciso de mais detalhes"
+                })
+            
+            # Comentário lateral
+            elif event_type == EventType.SHARK_COMMENT_LATERAL:
+                # Cochichou com outro shark
+                other_sharks = [s.get('archetype_name') for s in sharks if s.get('archetype_name') != actor]
+                if other_sharks:
+                    target = random.choice(other_sharks)
+                    micro_sinais.append({
+                        "turno": turno,
+                        "shark": actor,
+                        "sinal": f"cochichou algo com {target}",
+                        "traducao_psicologica": "Avaliação paralela"
+                    })
+        
+        # Adicionar sinais baseados no estado final dos sharks
+        for shark in sharks:
+            state = shark.get('state', {})
+            interest = state.get('interest', 50)
+            is_out = shark.get('is_out', False)
+            archetype_name = shark.get('archetype_name', '')
+            
+            # Shark com alto interesse mas não ofertou
+            if interest > 70 and not is_out and not any(s['shark'] == archetype_name and 'anotando' in s['sinal'] for s in micro_sinais):
+                micro_sinais.append({
+                    "turno": turno,  # Final da sessão
+                    "shark": archetype_name,
+                    "sinal": "manteve contato visual, sorriso contido",
+                    "traducao_psicologica": "Gostei, mas não confio ainda"
+                })
+        
+        # Ordenar por turno
+        micro_sinais.sort(key=lambda x: x.get('turno', 0))
+        
+        return micro_sinais[:15]  # Limitar a 15 sinais mais relevantes
+    
+    def _generate_autopsia(self, events: List[Dict], sharks: List[Dict], messages: List[Dict], 
+                          offers: List[Dict], deals: List[Dict], ending_type: str) -> Dict[str, Any]:
+        """
+        Gera análise profunda no estilo 'autópsia' - não diz se foi bem ou mal,
+        mas responde perguntas específicas sobre a sessão.
+        """
+        autopsia = {
+            "momento_irreversivel": None,
+            "primeiro_shark_perdido": None,
+            "pergunta_nao_respondida": None,
+            "onde_perdeu_tracao": None,
+            "onde_ganhou_respeito": None,
+            "risco_desnecessario": None,
+            "decisao_que_matou": None
+        }
+        
+        # 1. "Qual foi o momento irreversível?"
+        if ending_type == 'TABLE_BROKEN':
+            # Encontrar o momento em que ofertas foram retiradas
+            withdrawal_event = next((e for e in events if e.get('event_type') == EventType.SHARK_OFFER_WITHDRAWN), None)
+            if withdrawal_event:
+                autopsia["momento_irreversivel"] = f"Quando {withdrawal_event.get('actor')} retirou a oferta. A hesitação custou o deal."
+            else:
+                autopsia["momento_irreversivel"] = "A janela de negociação fechou antes de uma decisão ser tomada."
+        elif ending_type == 'NO_DEAL':
+            # Encontrar primeira saída significativa
+            first_out = next((e for e in events if e.get('event_type') == EventType.SHARK_OUT), None)
+            offer_events = [e for e in events if e.get('event_type') == EventType.SHARK_OFFER]
+            if not offer_events:
+                autopsia["momento_irreversivel"] = "Nenhuma oferta foi feita. O interesse nunca se converteu em compromisso."
+            elif first_out:
+                autopsia["momento_irreversivel"] = f"A saída de {first_out.get('actor')} mudou a dinâmica. Os outros perderam urgência."
+        elif ending_type in ['DEAL_CLOSED', 'DEAL_BITTER']:
+            deal_event = next((e for e in events if e.get('event_type') == EventType.DEAL_CLOSED), None)
+            if deal_event:
+                autopsia["momento_irreversivel"] = f"A decisão de fechar com {deal_event.get('actor')}. Não há volta depois de um aperto de mãos."
+        
+        # 2. "Qual shark você perdeu primeiro — e por quê?"
+        shark_out_events = [e for e in events if e.get('event_type') == EventType.SHARK_OUT]
+        if shark_out_events:
+            first_out = shark_out_events[0]
+            shark_name = first_out.get('actor', '')
+            
+            # Encontrar o shark correspondente para analisar o motivo
+            shark_data = next((s for s in sharks if s.get('archetype_name') == shark_name), None)
+            if shark_data:
+                state = shark_data.get('state', {})
+                confianca_ideia = state.get('confianca_ideia', 50)
+                confianca_apresentacao = state.get('confianca_apresentacao', 50)
+                
+                if confianca_ideia < 40:
+                    reason = "A ideia nunca convenceu."
+                elif confianca_apresentacao < confianca_ideia - 15:
+                    reason = "A ideia tinha potencial, mas as respostas não transmitiram confiança."
+                else:
+                    reason = "Não viu fit com sua tese de investimento."
+                
+                autopsia["primeiro_shark_perdido"] = f"{shark_name}. {reason}"
+        
+        # 3. "O que você nunca respondeu de verdade?"
+        evasive_events = [e for e in events if e.get('event_type') == EventType.ANSWER_EVASIVE]
+        if evasive_events:
+            # Pegar a primeira pergunta que teve resposta evasiva
+            first_evasive = evasive_events[0]
+            data = first_evasive.get('data', {})
+            question_topic = data.get('question_topic', 'uma pergunta crítica')
+            autopsia["pergunta_nao_respondida"] = f"Quando perguntaram sobre {question_topic}, a resposta não foi direta."
+        else:
+            # Verificar se houve perguntas sobre temas difíceis
+            questions = [m for m in messages if m.get('message_type') == MessageType.QUESTION]
+            difficult_keywords = ['margem', 'concorrência', 'diferencial', 'CAC', 'churn', 'unit economics', 'defensável']
+            for q in questions:
+                content = q.get('content', '').lower()
+                for keyword in difficult_keywords:
+                    if keyword in content:
+                        autopsia["pergunta_nao_respondida"] = f"A questão sobre {keyword} pode ter ficado no ar."
+                        break
+                if autopsia["pergunta_nao_respondida"]:
+                    break
+        
+        # 4. "Onde você perdeu tração?"
+        # Analisar sequência de eventos negativos
+        negative_sequence = []
+        for i, event in enumerate(events):
+            event_type = event.get('event_type', '')
+            if event_type in [EventType.SHARK_OUT, EventType.ANSWER_EVASIVE, EventType.SHARK_OFFER_WITHDRAWN]:
+                negative_sequence.append(event)
+        
+        if len(negative_sequence) >= 2:
+            first_negative = negative_sequence[0]
+            if first_negative.get('event_type') == EventType.ANSWER_EVASIVE:
+                autopsia["onde_perdeu_tracao"] = "Uma resposta evasiva gerou desconfiança que se espalhou pela mesa."
+            elif first_negative.get('event_type') == EventType.SHARK_OUT:
+                autopsia["onde_perdeu_tracao"] = f"A saída de {first_negative.get('actor')} criou um efeito dominó."
+            else:
+                autopsia["onde_perdeu_tracao"] = "A janela de oportunidade fechou mais rápido que o esperado."
+        
+        # 5. "Onde você ganhou respeito?"
+        offer_events = [e for e in events if e.get('event_type') == EventType.SHARK_OFFER]
+        high_interest_sharks = [s for s in sharks if s.get('state', {}).get('interest', 0) > 65]
+        
+        if deals:
+            autopsia["onde_ganhou_respeito"] = "Fechar o deal mostra que algo funcionou. A pergunta é: foi o bastante?"
+        elif len(offer_events) > 1:
+            autopsia["onde_ganhou_respeito"] = f"Conseguir {len(offer_events)} ofertas simultaneamente é raro. Houve competição genuína."
+        elif offer_events:
+            autopsia["onde_ganhou_respeito"] = f"{offer_events[0].get('actor')} viu algo. Só um viu, mas viu."
+        elif high_interest_sharks:
+            names = ", ".join([s.get('archetype_name', '') for s in high_interest_sharks[:2]])
+            autopsia["onde_ganhou_respeito"] = f"{names} mantiveram interesse alto. Quase lá."
+        else:
+            autopsia["onde_ganhou_respeito"] = "Nenhum ponto de respeito claro foi estabelecido."
+        
+        # 6. "Onde tomou risco desnecessário?"
+        reject_events = [e for e in events if e.get('event_type') == EventType.FOUNDER_REJECTED]
+        counter_events = [e for e in events if e.get('event_type') == EventType.FOUNDER_COUNTERED]
+        wait_events = [e for e in events if e.get('event_type') == EventType.FOUNDER_WAITED]
+        
+        if reject_events and not deals:
+            shark = reject_events[0].get('data', {}).get('shark', 'um investidor')
+            autopsia["risco_desnecessario"] = f"Recusar a oferta de {shark}. Era confiança ou arrogância?"
+        elif len(wait_events) > 1:
+            autopsia["risco_desnecessario"] = "Esperar demais. Cada turno de espera custou paciência da mesa."
+        elif counter_events:
+            autopsia["risco_desnecessario"] = "A contra-proposta foi ousada. Nem sempre ousadia é premiada."
+        
+        # 7. "Qual decisão matou o jogo?" (se aplicável)
+        if ending_type == 'TABLE_BROKEN':
+            if wait_events and len(wait_events) >= 2:
+                autopsia["decisao_que_matou"] = "Esperar demais. A indecisão foi interpretada como falta de convicção."
+            elif reject_events:
+                autopsia["decisao_que_matou"] = f"Recusar {reject_events[0].get('data', {}).get('shark', '')}. Depois disso, não houve volta."
+            else:
+                autopsia["decisao_que_matou"] = "Não agir quando havia oferta na mesa. O silêncio também é uma decisão."
+        elif ending_type == 'NO_DEAL' and offer_events:
+            autopsia["decisao_que_matou"] = "Havia interesse, mas não houve conversão. Alguma coisa no meio do caminho travou."
+        
+        return autopsia
