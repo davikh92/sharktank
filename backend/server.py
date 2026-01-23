@@ -472,6 +472,7 @@ async def process_founder_action(
     current_phase = session.get('phase', 'exploration')
     current_session_phase = session.get('session_phase', 'PITCHING')
     negotiation_state = session.get('negotiation_state', None)
+    pitch_evaluation = session.get('pitch_evaluation', None)  # NOVO
     
     # Criar orquestrador
     orchestrator = Orchestrator(
@@ -482,7 +483,8 @@ async def process_founder_action(
         initial_turn_count=current_turn_count,
         initial_phase=current_phase,
         initial_session_phase=current_session_phase,
-        initial_negotiation_state=negotiation_state
+        initial_negotiation_state=negotiation_state,
+        pitch_evaluation=pitch_evaluation  # NOVO
     )
     
     # Processar ação do founder
