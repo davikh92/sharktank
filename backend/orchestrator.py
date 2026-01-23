@@ -792,6 +792,26 @@ class Orchestrator:
         msg = await self._save_message("FOUNDER", founder_msg, MessageType.COUNTER_OFFER)
         messages.append(msg)
         
+        # === AVALIAR AGRESSIVIDADE DA CONTRA-PROPOSTA ===
+        try:
+            original_equity = self.negotiation_manager._parse_equity(offer.equity)
+            counter_equity = self.negotiation_manager._parse_equity(counter.equity)
+            equity_diff = original_equity - counter_equity
+            
+            # Se pede muito menos equity (>5% diferença) = agressivo
+            if equity_diff > 5:
+                # Dano de confiança proporcional à agressividade
+                confidence_damage = min(20, equity_diff * 2)
+                shark.confianca -= confidence_damage
+                shark.state.confianca_apresentacao -= confidence_damage
+                
+                # Shark fica irritado
+                if equity_diff > 10:
+                    # Muito agressivo - chance de sair
+                    shark.state.patience -= 15
+        except:
+            pass
+        
         # Shark avalia contra-proposta
         accepted = self.negotiation_manager.evaluate_counter_offer(
             offer, counter, shark.state.interest, shark.confianca
