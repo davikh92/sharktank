@@ -295,50 +295,79 @@ const SessionRoom = () => {
             )}
           </div>
 
-          {/* Sharks Panel */}
+          {/* Sharks Panel - Estados Granulares */}
           <div className="grid grid-cols-4 gap-4" data-testid="sharks-panel">
             {session.sharks && session.sharks.map((shark, idx) => {
               // Verificar se shark está OUT baseado nos eventos (fonte primária de verdade)
               const isOut = sharksOutSet.has(shark.archetype_name) || shark.state?.is_out || false;
               const hasOffer = activeOffers.some(o => o.shark_name === shark.archetype_name);
+              const interest = shark.state?.interest || 50;
+              const patience = shark.state?.patience || 50;
+              const inRecovery = shark.state?.in_recovery_window || false;
+              
+              // Determinar estado de exibição granular
+              const getDisplayState = () => {
+                if (isOut) return { state: 'OUT', icon: '✗', color: 'text-red-400', bg: 'bg-red-900/50' };
+                if (inRecovery) return { state: 'ÚLTIMA CHANCE', icon: '⏱️', color: 'text-yellow-400', bg: 'bg-yellow-900/50' };
+                if (hasOffer) {
+                  if (sessionPhase === 'NEGOTIATION_WINDOW') {
+                    return { state: 'NEGOCIANDO', icon: '🤝', color: 'text-blue-400', bg: 'bg-blue-900/50' };
+                  }
+                  return { state: 'OFERTA', icon: '💰', color: 'text-green-400', bg: 'bg-green-900' };
+                }
+                if (patience < 25) return { state: 'IMPACIENTE', icon: '⚠️', color: 'text-orange-400', bg: 'bg-orange-900/30' };
+                if (interest < 35) return { state: 'CÉTICO', icon: '🤨', color: 'text-gray-400', bg: 'bg-gray-700' };
+                if (interest >= 70) return { state: 'INTERESSADO', icon: '👀', color: 'text-green-400', bg: 'bg-green-900/30' };
+                return { state: 'ATIVO', icon: '●', color: 'text-gray-400', bg: 'bg-gray-700' };
+              };
+              
+              const displayState = getDisplayState();
+              
               return (
                 <div
                   key={idx}
                   className={`panel-seat rounded-lg p-4 text-center transition-all duration-500 ${
                     isOut 
                       ? 'opacity-40 bg-red-900/20 border border-red-900/50' 
-                      : hasOffer 
-                        ? 'ring-2 ring-green-500' 
-                        : ''
+                      : inRecovery
+                        ? 'bg-yellow-900/20 border border-yellow-700/50 animate-pulse'
+                        : hasOffer 
+                          ? 'ring-2 ring-green-500' 
+                          : displayState.state === 'IMPACIENTE'
+                            ? 'border border-orange-700/50'
+                            : displayState.state === 'INTERESSADO'
+                              ? 'border border-green-700/30'
+                              : ''
                   }`}
                   data-testid={`shark-panel-${shark.archetype_name.toLowerCase().replace(/\s/g, '-')}`}
                 >
-                  <div className={`w-16 h-16 mx-auto mb-3 rounded-full flex items-center justify-center transition-colors ${
-                    isOut 
-                      ? 'bg-red-900/50' 
-                      : hasOffer 
-                        ? 'bg-green-900' 
-                        : 'bg-gray-700'
-                  }`}>
+                  <div className={`w-16 h-16 mx-auto mb-3 rounded-full flex items-center justify-center transition-colors ${displayState.bg}`}>
                     <span className={`text-2xl ${isOut ? 'opacity-50' : ''}`}>
-                      {shark.archetype_name.charAt(0)}
+                      {displayState.icon !== '●' && displayState.icon !== '✗' ? displayState.icon : shark.archetype_name.charAt(0)}
                     </span>
                   </div>
                   <h3 className={`font-semibold text-sm mb-1 ${isOut ? 'text-gray-500 line-through' : 'text-white'}`}>
                     {shark.archetype_name}
                   </h3>
                   <span 
-                    className={`text-xs font-bold ${
-                      isOut 
-                        ? 'text-red-400' 
-                        : hasOffer 
-                          ? 'text-green-400' 
-                          : 'text-gray-400'
-                    }`}
+                    className={`text-xs font-bold ${displayState.color}`}
                     data-testid={`shark-status-${shark.archetype_name.toLowerCase().replace(/\s/g, '-')}`}
                   >
-                    {isOut ? '✗ OUT' : hasOffer ? '💰 OFERTA' : '● ATIVO'}
+                    {displayState.icon} {displayState.state}
                   </span>
+                  {/* Barra de interesse (sutil) */}
+                  {!isOut && (
+                    <div className="mt-2 h-1 bg-gray-800 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full transition-all duration-500 ${
+                          interest > 70 ? 'bg-green-500' : 
+                          interest > 50 ? 'bg-gray-500' : 
+                          interest > 30 ? 'bg-orange-500' : 'bg-red-500'
+                        }`}
+                        style={{ width: `${interest}%` }}
+                      />
+                    </div>
+                  )}
                 </div>
               );
             })}
