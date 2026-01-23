@@ -51,7 +51,7 @@ const Landing = () => {
               Investor Panel Simulator
             </h1>
             <p className="text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed mb-8">
-              Você não entra aqui para "ver se dá certo".
+              Você não entra aqui para &ldquo;ver se dá certo&rdquo;.
             </p>
             <p className="text-lg text-gray-500 max-w-xl mx-auto">
               Você entra para descobrir se a sua ideia aguenta a mesa.
