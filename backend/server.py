@@ -113,6 +113,22 @@ async def create_session(
     session_id = str(uuid.uuid4())
     created_at = datetime.now(timezone.utc).isoformat()
     
+    # === AVALIAR O PITCH (IDEIA vs APRESENTAÇÃO) ===
+    pitch_evaluator = PitchEvaluator()
+    pitch_score = pitch_evaluator.evaluate(session_data.pitch.model_dump())
+    
+    # Criar objeto de avaliação para persistir
+    pitch_evaluation = PitchEvaluation(
+        originalidade=pitch_score.originalidade,
+        potencial_mercado=pitch_score.potencial_mercado,
+        diferencial_defensavel=pitch_score.diferencial_defensavel,
+        clareza_problema=pitch_score.clareza_problema,
+        modelo_negocio=pitch_score.modelo_negocio,
+        idea_score=pitch_score.idea_score,
+        idea_tier=pitch_score.idea_tier,
+        offer_probability_multiplier=pitch_evaluator.get_offer_probability_multiplier(pitch_score)
+    )
+    
     # Selecionar painel de sharks
     all_archetypes = get_all_archetypes()
     
@@ -130,11 +146,12 @@ async def create_session(
         # Random (todos os 4)
         selected_archetypes = all_archetypes
     
-    # Criar sessão
+    # Criar sessão com avaliação do pitch
     session_doc = {
         "id": session_id,
         "user_id": current_user['user_id'],
         "pitch": session_data.pitch.model_dump(),
+        "pitch_evaluation": pitch_evaluation.model_dump(),  # NOVO
         "panel_selection": session_data.panel_selection,
         "reading_hints_enabled": session_data.reading_hints_enabled,
         "status": SessionStatus.PENDING,
@@ -143,11 +160,27 @@ async def create_session(
     
     await db.sessions.insert_one(session_doc)
     
-    # Criar sharks da sessão
+    # Criar sharks da sessão COM interesse inicial baseado na IDEIA
     sharks_response = []
     for archetype in selected_archetypes:
         shark_id = str(uuid.uuid4())
-        initial_state = SharkState()
+        
+        # Calcular interesse inicial baseado na IDEIA
+        initial_interest = pitch_evaluator.get_shark_initial_interest(pitch_score, archetype['id'])
+        initial_interest = max(20, min(80, initial_interest))  # Limitar entre 20-80
+        
+        # Determinar ceticismo inicial
+        skepticism = pitch_evaluator.get_skepticism_level(pitch_score, 50)  # 50 = apresentação neutra inicial
+        
+        # Criar estado inicial com scores da IDEIA
+        initial_state = SharkState(
+            interest=initial_interest,
+            confianca_ideia=pitch_score.idea_score,
+            confianca_apresentacao=50.0,  # Começa neutro, muda com respostas
+            initial_interest=initial_interest,
+            skepticism=skepticism,
+            confianca=pitch_score.idea_score  # Confiança geral começa igual à ideia
+        )
         
         shark_doc = {
             "shark_id": shark_id,
@@ -168,6 +201,15 @@ async def create_session(
     
     # Criar evento SESSION_STARTED
     await db.events.insert_one({
+        "id": str(uuid.uuid4()),
+        "session_id": session_id,
+        "event_type": EventType.SESSION_STARTED,
+        "actor": "SYSTEM",
+        "timestamp": created_at,
+        "data": {
+            "pitch_evaluation": pitch_evaluation.model_dump()  # NOVO
+        }
+    })
         "id": str(uuid.uuid4()),
         "session_id": session_id,
         "event_type": EventType.SESSION_STARTED,
