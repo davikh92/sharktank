@@ -1126,32 +1126,73 @@ class Orchestrator:
         messages: List[MessageResponse],
         events: List[EventResponse]
     ):
-        """Gera conflito entre sharks quando há múltiplas ofertas"""
+        """
+        Gera conflito entre sharks quando há múltiplas ofertas.
+        Pode resultar em:
+        - Comentário de um shark sobre a oferta do outro
+        - MELHORIA ESPONTÂNEA de oferta (competição)
+        """
         if len(self.active_offers) < 2:
             return
         
-        # 40% de chance de conflito
+        offer1 = self.active_offers[0]
+        offer2 = self.active_offers[1]
+        
+        shark1 = next((s for s in self.sharks if s.shark_id == offer1.shark_id), None)
+        shark2 = next((s for s in self.sharks if s.shark_id == offer2.shark_id), None)
+        
+        if not shark1 or not shark2:
+            return
+        
+        # 40% de chance de conflito verbal
         if random.random() < 0.4:
-            offer1 = self.active_offers[0]
-            offer2 = self.active_offers[1]
+            speech = self.negotiation_manager.generate_shark_conflict(
+                shark1.archetype['name'],
+                shark2.archetype['name'],
+                offer2
+            )
+            msg = await self._save_message(shark1.archetype['name'], speech, MessageType.SHARK_CONFLICT)
+            messages.append(msg)
             
-            shark1 = next((s for s in self.sharks if s.shark_id == offer1.shark_id), None)
-            shark2 = next((s for s in self.sharks if s.shark_id == offer2.shark_id), None)
+            conflict_event = await self._save_event(EventType.SHARK_CONFLICT, shark1.archetype['name'], {
+                "target_shark": shark2.archetype['name'],
+                "target_offer_id": offer2.id
+            })
+            events.append(conflict_event)
+        
+        # 20% de chance de MELHORIA ESPONTÂNEA (um shark melhora sua oferta para competir)
+        if random.random() < 0.2:
+            # Escolher qual shark vai melhorar
+            improving_shark = shark1 if shark1.state.interest > shark2.state.interest else shark2
+            improving_offer = offer1 if improving_shark == shark1 else offer2
             
-            if shark1 and shark2:
-                speech = self.negotiation_manager.generate_shark_conflict(
-                    shark1.archetype['name'],
-                    shark2.archetype['name'],
-                    offer2
-                )
-                msg = await self._save_message(shark1.archetype['name'], speech, MessageType.SHARK_CONFLICT)
+            # Melhorar a oferta (reduzir equity em 1-3%)
+            try:
+                current_equity = self.negotiation_manager._parse_equity(improving_offer.equity)
+                new_equity = max(current_equity - random.randint(1, 3), 
+                                self.negotiation_manager._parse_equity(self.pitch_data.get('pedido_equity', '10%')))
+                improving_offer.equity = f"{new_equity:.0f}%"
+                improving_offer.turns_remaining = max(improving_offer.turns_remaining, 2)  # Renovar validade
+                await self.save_offer(improving_offer)
+                
+                # Fala de melhoria
+                improvement_speeches = [
+                    f"Olha, eu vou melhorar minha proposta. {improving_offer.valor} por {improving_offer.equity}.",
+                    f"Tá bom, eu ajusto. {improving_offer.valor} por {improving_offer.equity}. Última palavra.",
+                    f"Não vou perder esse negócio. {improving_offer.valor} por {improving_offer.equity}."
+                ]
+                speech = random.choice(improvement_speeches)
+                msg = await self._save_message(improving_shark.archetype['name'], speech, MessageType.OFFER)
                 messages.append(msg)
                 
-                conflict_event = await self._save_event(EventType.SHARK_CONFLICT, shark1.archetype['name'], {
-                    "target_shark": shark2.archetype['name'],
-                    "target_offer_id": offer2.id
+                # Evento de melhoria
+                improve_event = await self._save_event(EventType.SHARK_OFFER_IMPROVED, improving_shark.archetype['name'], {
+                    "offer_id": improving_offer.id,
+                    "new_equity": improving_offer.equity
                 })
-                events.append(conflict_event)
+                events.append(improve_event)
+            except:
+                pass  # Se falhar o parse, ignora
     
     async def _end_session_with_negotiation(
         self,
