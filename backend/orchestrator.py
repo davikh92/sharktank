@@ -897,32 +897,67 @@ class Orchestrator:
         messages: List[MessageResponse],
         events: List[EventResponse]
     ) -> Optional[Offer]:
-        """Tenta gerar uma nova oferta se condições forem atendidas"""
+        """
+        Tenta gerar uma nova oferta se condições forem atendidas.
+        
+        CALIBRAGEM: Ofertas são RARAS
+        - 0 ofertas: Normal (maioria dos pitches)
+        - 1 oferta: Bom pitch
+        - 2 ofertas: Muito bom (raro)
+        - 3+ ofertas: Excepcional (< 5% dos casos)
+        """
+        # Limitar número máximo de ofertas baseado na ideia
+        max_offers_by_tier = {
+            "RUIM": 0,
+            "FRACA": 1,
+            "MEDIANA": 1,
+            "FORTE": 2,
+            "EXCEPCIONAL": 3
+        }
+        max_offers = max_offers_by_tier.get(self.idea_tier, 1)
+        
+        if len(self.active_offers) + self.total_offers_made >= max_offers:
+            return None  # Já atingiu o limite
+        
         # Sharks que já têm oferta ativa não fazem outra
         sharks_with_offers = {o.shark_id for o in self.active_offers}
+        
+        # Usar confiança da IDEIA como threshold (não só apresentação)
         eligible_sharks = [
             s for s in active_sharks 
             if s.shark_id not in sharks_with_offers
             and s.state.interest >= 75 
-            and s.confianca >= 45
+            and s.state.confianca_ideia >= 40  # NOVO: baseado na ideia
         ]
         
         if not eligible_sharks:
             return None
         
         for shark in eligible_sharks:
-            # Probabilidade baseada no interesse (MUITO MAIS RARA)
-            base_prob = 0.08  # 8% base (era 20%)
+            # Probabilidade BASE muito mais baixa
+            base_prob = 0.03  # 3% base (era 8%)
+            
             if shark.state.interest >= 90:
-                base_prob = 0.15  # 15% (era 35%)
+                base_prob = 0.06  # 6% (era 15%)
             if shark.state.interest >= 100:
-                base_prob = 0.25  # 25% (era 50%)
+                base_prob = 0.10  # 10% (era 25%)
+            
+            # MULTIPLICADOR DA IDEIA (crucial!)
+            base_prob *= self.offer_probability_multiplier
             
             # Multiplicador temporal
             if self.turn_count >= 10:
-                base_prob *= 1.2
-            if self.turn_count >= 14:
                 base_prob *= 1.3
+            if self.turn_count >= 14:
+                base_prob *= 1.5
+            
+            # Se shark "viu potencial" em ideia boa mal apresentada
+            if shark.state.saw_potential:
+                base_prob *= 1.5
+            
+            # Se shark está DESCONFIADO (apresentação boa, ideia fraca)
+            if shark.state.skepticism == "DESCONFIADO":
+                base_prob *= 0.3  # Muito menos provável
             
             if random.random() < base_prob:
                 # Criar oferta
