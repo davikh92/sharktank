@@ -305,7 +305,7 @@ const Report = () => {
                   </p>
                   
                   <p className="text-sm text-gray-300 italic mb-4" style={{ fontFamily: "'Cormorant Garamond', serif" }}>
-                    "{shark.o_que_pensou}"
+                    &ldquo;{shark.o_que_pensou}&rdquo;
                   </p>
                   
                   {/* Barras de confiança */}
