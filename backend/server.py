@@ -355,11 +355,31 @@ async def respond_to_session(
     # Buscar sharks
     sharks = await db.session_sharks.find({"session_id": session_id}, {"_id": 0}).to_list(10)
     
-    # Criar orquestrador
-    orchestrator = Orchestrator(db, session_id, session['pitch'], sharks)
+    # Carregar turn_count persistido da sessão (FIX: não criar nova instância do zero)
+    current_turn_count = session.get('turn_count', 0)
+    current_phase = session.get('phase', 'exploration')
+    
+    # Criar orquestrador COM estado existente
+    orchestrator = Orchestrator(
+        db, 
+        session_id, 
+        session['pitch'], 
+        sharks,
+        initial_turn_count=current_turn_count,
+        initial_phase=current_phase
+    )
     
     # Processar resposta
     response = await orchestrator.process_user_answer(user_message.content)
+    
+    # Persistir turn_count e phase atualizados na sessão
+    await db.sessions.update_one(
+        {"id": session_id},
+        {"$set": {
+            "turn_count": orchestrator.turn_count,
+            "phase": orchestrator.phase
+        }}
+    )
     
     return response
 

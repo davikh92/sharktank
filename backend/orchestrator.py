@@ -372,12 +372,20 @@ Não seja prolixo. Seja incisivo."""
             return random.choice(self.archetype['perguntas_tipicas'])
 
 class Orchestrator:
-    def __init__(self, db, session_id: str, pitch_data: Dict[str, Any], sharks_data: List[Dict[str, Any]]):
+    def __init__(
+        self, 
+        db, 
+        session_id: str, 
+        pitch_data: Dict[str, Any], 
+        sharks_data: List[Dict[str, Any]],
+        initial_turn_count: int = 0,
+        initial_phase: str = "exploration"
+    ):
         self.db = db
         self.session_id = session_id
         self.pitch_data = pitch_data
-        self.turn_count = 0
-        self.phase = "exploration"  # exploration, tension, closing
+        self.turn_count = initial_turn_count  # CARREGA do banco, não começa do zero
+        self.phase = initial_phase  # CARREGA do banco
         
         # Criar agentes dos sharks
         self.sharks: List[SharkAgent] = []
