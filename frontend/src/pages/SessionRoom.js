@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   getSession, 
@@ -36,6 +36,17 @@ const SessionRoom = () => {
   const [counterValor, setCounterValor] = useState('');
   const [counterEquity, setCounterEquity] = useState('');
   const [counterMessage, setCounterMessage] = useState('');
+
+  // Calcular quais sharks estão OUT baseado nos eventos
+  const sharksOutSet = useMemo(() => {
+    const outSet = new Set();
+    events.forEach(event => {
+      if (event.event_type === 'SHARK_OUT') {
+        outSet.add(event.actor);
+      }
+    });
+    return outSet;
+  }, [events]);
 
   useEffect(() => {
     loadSession();
