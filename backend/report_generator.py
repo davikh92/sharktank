@@ -63,6 +63,12 @@ class ReportGenerator:
         # 10. NOVO: Avaliação da ideia vs apresentação
         avaliacao_idea = self._generate_avaliacao_idea(pitch_evaluation, sharks)
         
+        # 11. NOVO: Micro-sinais não verbais
+        micro_sinais = self._generate_micro_sinais(events, sharks, messages)
+        
+        # 12. NOVO: Autópsia da sessão (análise profunda)
+        autopsia = self._generate_autopsia(events, sharks, messages, offers, deals_closed, ending_type)
+        
         # Salvar relatório
         report_id = str(uuid.uuid4())
         generated_at = datetime.now(timezone.utc).isoformat()
@@ -80,6 +86,8 @@ class ReportGenerator:
             "momento_virada": momento_virada,
             "pergunta_provocativa": pergunta_provocativa,
             "avaliacao_idea": avaliacao_idea,
+            "micro_sinais": micro_sinais,
+            "autopsia": autopsia,
             "generated_at": generated_at
         }
         
