@@ -175,6 +175,17 @@ class NegotiationState(BaseModel):
     turns_in_negotiation: int = 0
     ending_type: Optional[EndingType] = None
 
+class PitchEvaluation(BaseModel):
+    """Avaliação da ideia do pitch (separado da apresentação)"""
+    originalidade: float = 50.0
+    potencial_mercado: float = 50.0
+    diferencial_defensavel: float = 50.0
+    clareza_problema: float = 50.0
+    modelo_negocio: float = 50.0
+    idea_score: float = 50.0
+    idea_tier: str = "MEDIANA"  # RUIM, FRACA, MEDIANA, FORTE, EXCEPCIONAL
+    offer_probability_multiplier: float = 0.6
+
 class SessionSharkResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
     shark_id: str
