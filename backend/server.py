@@ -207,15 +207,8 @@ async def create_session(
         "actor": "SYSTEM",
         "timestamp": created_at,
         "data": {
-            "pitch_evaluation": pitch_evaluation.model_dump()  # NOVO
+            "pitch_evaluation": pitch_evaluation.model_dump()
         }
-    })
-        "id": str(uuid.uuid4()),
-        "session_id": session_id,
-        "event_type": EventType.SESSION_STARTED,
-        "actor": "SYSTEM",
-        "timestamp": created_at,
-        "data": {}
     })
     
     # Criar evento PITCH_SUBMITTED
