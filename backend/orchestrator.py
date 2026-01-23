@@ -550,7 +550,6 @@ class Orchestrator:
                         messages.append(offer_msg)
                         events.append(offer_event)
                         break  # Só uma oferta por turno
-                events.append(offer_event)
         
         # 9. Decidir tipo de resposta
         # Chance de interrupção
