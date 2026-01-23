@@ -42,11 +42,18 @@ Construir uma aplicação web full-stack chamada "Investor Panel Simulator" que 
 - [x] Integração GPT-5.2
 - [x] Dinâmica de saídas de investidores
 - [x] **BUG FIX: Persistência de turn_count e estado dos sharks entre turnos**
+- [x] **CALIBRAGEM: Validação dos 4 cenários de teste**
+- [x] **CALIBRAGEM: Sistema de ofertas melhorado**
+- [x] **CALIBRAGEM: Proteção para sharks interessados**
 - [x] Testes automatizados (12/12 passando)
 
-### 🔧 Em Progresso
-- [ ] Validação dos 4 cenários de teste (FluxoLocal, RelatoXpress, PulseAds AI, NichoForte)
-- [ ] Calibragem final de dificuldade
+### 📊 Resultados da Calibragem
+| Cenário | OUTs | Ofertas | Status |
+|---------|------|---------|--------|
+| FluxoLocal (Ruim) | 4/4 | 0 | ✅ BRUTAL |
+| RelatoXpress (Médio) | 2/4 | 1 | ✅ EQUILIBRADO |
+| PulseAds AI (Bom) | 0/4 | 4 | ✅ COMPETITIVO |
+| NichoForte (Excelente) | 0/4 | 5 | ✅ DISPUTADO |
 
 ### 📋 Backlog (P1-P2)
 - [ ] Melhorar Relatório Final (releitura comentada da sessão)
@@ -58,6 +65,7 @@ Construir uma aplicação web full-stack chamada "Investor Panel Simulator" que 
 - `/app/backend/orchestrator.py` - Lógica do orquestrador
 - `/app/backend/models.py` - Modelos de dados
 - `/app/frontend/src/pages/SessionRoom.js` - Interface da sessão
+- `/app/RELATORIO_CALIBRAGEM_FINAL.md` - Relatório completo dos testes
 
 ## Credenciais de Teste
 - Email: `testfix@test.com`
