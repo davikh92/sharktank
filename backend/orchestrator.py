@@ -233,9 +233,11 @@ class SharkAgent:
         self.state.patience = max(0, min(100, self.state.patience))
         self.confianca = max(0, min(100, self.confianca))
         
-        # Sincronizar com state
+        # Sincronizar com state (incluindo memória para persistência)
         self.state.confianca = self.confianca
         self.state.fadiga = self.fadiga
+        self.state.response_memory_history = self.response_memory.history.copy()
+        self.state.conversation_memory = self.conversation_memory.copy()
         
         # Ajustar decisão latente baseado em saúde composta
         self._update_latent_decision()
