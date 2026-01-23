@@ -468,7 +468,7 @@ const SessionRoom = () => {
                       </div>
                     </div>
                     {offer.conditions && (
-                      <p className="text-xs text-gray-400 mb-3 italic">"{offer.conditions}"</p>
+                      <p className="text-xs text-gray-400 mb-3 italic">&ldquo;{offer.conditions}&rdquo;</p>
                     )}
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-yellow-500">
