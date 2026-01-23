@@ -398,7 +398,7 @@ const Report = () => {
                 className="text-2xl text-gray-200 leading-relaxed"
                 style={{ fontFamily: "'Cormorant Garamond', serif" }}
               >
-                "{report.pergunta_provocativa}"
+                &ldquo;{report.pergunta_provocativa}&rdquo;
               </p>
             </section>
           )}
