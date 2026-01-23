@@ -1405,18 +1405,63 @@ Seja direto e sem rodeios. Use o estilo: {shark.archetype['estilo']}."""
         
         return message, event
     
-    async def _generate_out(self, shark: SharkAgent) -> tuple:
-        """Gera a saída de um shark"""
-        shark.state.is_out = True
+    async def _generate_last_chance_warning(self, shark: SharkAgent) -> MessageResponse:
+        """Gera mensagem de 'última chance' antes de sair"""
+        archetype_id = shark.archetype['id']
         
-        context = "Você está saindo do investimento. Seja direto e explique brevemente por quê."
+        # Mensagens específicas por arquétipo
+        if archetype_id == 'operador':
+            prompts = [
+                "Vou dar mais 20 segundos. Me convença que você tem clareza de quem vai executar isso.",
+                "Última chance. Me diz em uma frase: quem faz isso acontecer?",
+                "Eu vou parar de perguntar. Você tem mais uma oportunidade de me mostrar que sabe onde está pisando."
+            ]
+        elif archetype_id == 'financeiro':
+            prompts = [
+                "Antes de eu desistir... me dá um número. Um número que me faça ficar.",
+                "Última tentativa. Qual é o número que você tem certeza?",
+                "Me convença com dados. Você tem mais uma chance."
+            ]
+        elif archetype_id == 'cetico':
+            prompts = [
+                "Estou quase saindo. Me mostra uma coisa que eu não posso copiar amanhã.",
+                "Uma chance. O que te protege da concorrência?",
+                "Me dá um motivo para não ir embora. Um diferencial real."
+            ]
+        else:  # visionario
+            prompts = [
+                "Estou perdendo interesse. Me mostra que você acredita de verdade nisso.",
+                "Você tem mais uma chance de me fazer ver o futuro aqui.",
+                "Me convence. Por que isso vai ser grande?"
+            ]
+        
+        speech = random.choice(prompts)
+        
+        message = await self._save_message(shark.archetype['name'], speech, MessageType.INTERRUPTION)
+        return message
+    
+    async def _generate_out(self, shark: SharkAgent, exit_type: Optional[str] = None) -> tuple:
+        """Gera a saída de um shark com variações baseadas no exit_type"""
+        shark.state.is_out = True
+        shark.state.display_state = "OUT"
+        
+        # Contexto varia baseado no tipo de saída
+        if exit_type == "FRUSTRATED_EXIT":
+            context = "Você está saindo FRUSTRADO. Você deu chances, esperou, e não veio resposta adequada. Seja direto sobre sua frustração."
+        elif exit_type == "IMMEDIATE":
+            context = "Você está saindo imediatamente. A paciência acabou. Seja breve e incisivo."
+        else:
+            context = "Você está saindo do investimento. Seja direto e explique brevemente por quê."
+        
         speech = await shark.generate_speech("OUT", context)
         
         message = await self._save_message(shark.archetype['name'], speech, MessageType.OUT_ANNOUNCEMENT)
         event = await self._save_event(EventType.SHARK_OUT, shark.archetype['name'], {
             "reason": "Perda de interesse",
+            "exit_type": exit_type,
             "final_interest": shark.state.interest,
-            "final_patience": shark.state.patience
+            "final_patience": shark.state.patience,
+            "had_recovery_window": shark.state.frustration_shown
         })
         
         # Atualizar no banco
