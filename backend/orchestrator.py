@@ -505,6 +505,9 @@ class Orchestrator:
         messages: List[MessageResponse] = []
         events: List[EventResponse] = []
         
+        # Carregar ofertas ativas do banco
+        await self.load_active_offers()
+        
         # 1. Salvar resposta do usuário
         user_message = await self._save_message("USER", answer, MessageType.ANSWER)
         messages.append(user_message)
@@ -531,25 +534,24 @@ class Orchestrator:
                     {"$set": {"state": shark.state.model_dump()}}
                 )
         
-        # 5. Decidir próximo evento
+        # 5. Atualizar validade das ofertas ativas
+        expired_offers = await self._update_offers_validity(messages, events)
+        
+        # 6. Decidir próximo evento
         active_sharks = [s for s in self.sharks if not s.state.is_out]
         
-        # LIMITE CRÍTICO: 18 turnos (não 20)
+        # LIMITE CRÍTICO: 18 turnos
         if self.turn_count >= 18:
-            closing_msg = await self._save_message(
-                "SYSTEM",
-                "Tempo esgotado.",
-                MessageType.COMMENT
-            )
-            messages.append(closing_msg)
-            return await self._end_session(messages, events)
+            return await self._end_session_with_negotiation(messages, events)
         
         if not active_sharks:
-            return await self._end_session(messages, events)
+            return await self._end_session_with_negotiation(messages, events)
         
-        # 6. VERIFICAR SAÍDAS AUTOMÁTICAS (decisão OUT é mandatória)
-        for shark in active_sharks[:]:  # Copiar lista para modificar durante iteração
+        # 7. VERIFICAR SAÍDAS AUTOMÁTICAS
+        for shark in active_sharks[:]:
             if shark.should_go_out(self.turn_count):
+                # Se shark tinha oferta ativa, retirar antes de sair
+                await self._withdraw_offer_if_exists(shark, messages, events)
                 out_msg, out_event = await self._generate_out(shark)
                 messages.append(out_msg)
                 events.append(out_event)
@@ -558,76 +560,48 @@ class Orchestrator:
         active_sharks = [s for s in self.sharks if not s.state.is_out]
         
         if not active_sharks:
-            return await self._end_session(messages, events)
+            return await self._end_session_with_negotiation(messages, events)
         
-        # 7. Escolher shark para responder
+        # 8. LÓGICA DE OFERTAS - NOVO SISTEMA
+        # Verificar se deve gerar nova oferta
+        if self.session_phase == SessionPhase.PITCHING and self.turn_count >= 6:
+            new_offer = await self._try_generate_offer(active_sharks, messages, events)
+            
+            if new_offer:
+                # Entrar em modo NEGOTIATION_WINDOW
+                self.session_phase = SessionPhase.NEGOTIATION_WINDOW
+                await self._save_event(EventType.NEGOTIATION_STARTED, "SYSTEM", {
+                    "offer_id": new_offer.id,
+                    "shark": new_offer.shark_name
+                })
+        
+        # 9. Se em NEGOTIATION_WINDOW, adicionar pressão
+        if self.session_phase == SessionPhase.NEGOTIATION_WINDOW and self.active_offers:
+            await self._add_offer_pressure(messages, events)
+        
+        # 10. Escolher shark para responder (se não houver oferta pendente)
         responding_shark = random.choice(active_sharks)
         
-        # 8. OFERTAS - Sistema melhorado de ofertas
-        # Após turno 8, sharks muito interessados podem fazer oferta
-        if self.turn_count >= 8:
-            sharks_interessados = [
-                s for s in active_sharks 
-                if s.state.interest >= 80 and s.confianca >= 50
-            ]
-            
-            if sharks_interessados:
-                # Probabilidade de oferta baseada no interesse
-                for shark in sharks_interessados:
-                    # Quanto maior o interesse, maior a chance
-                    base_prob = 0.20  # 20% base
-                    if shark.state.interest >= 90:
-                        base_prob = 0.35  # 35% para muito interessado
-                    if shark.state.interest >= 100:
-                        base_prob = 0.50  # 50% para máximo interesse
-                    
-                    # Multiplicador temporal (mais chances após turno 10)
-                    if self.turn_count >= 10:
-                        base_prob *= 1.3
-                    if self.turn_count >= 12:
-                        base_prob *= 1.2
-                    
-                    if random.random() < base_prob:
-                        offer_msg, offer_event = await self._generate_offer(shark)
-                        messages.append(offer_msg)
-                        events.append(offer_event)
-                        break  # Só uma oferta por turno
-        
-        # 9. Decidir tipo de resposta
-        # Chance de interrupção
+        # 11. Chance de interrupção
         if responding_shark.should_interrupt(self.turn_count) and self.turn_count > 2:
             interrupt_msg, interrupt_event = await self._generate_interruption(responding_shark)
             messages.append(interrupt_msg)
             events.append(interrupt_event)
         
-        # Chance de silêncio de outro shark
-        if random.random() < 0.15:  # Reduzido de 0.20
-            other_sharks = [s for s in active_sharks if s.shark_id != responding_shark.shark_id]
-            if other_sharks:
-                silent_shark = random.choice(other_sharks)
-                if silent_shark.should_go_silent():
-                    silent_event = await self._save_event(
-                        EventType.SHARK_SILENT,
-                        silent_shark.archetype['name'],
-                        {"reason": "Desinteresse"}
-                    )
-                    events.append(silent_event)
-                    silent_shark.state.silent_turns += 1
-        
-        # 9. Gerar próxima pergunta (com contexto do histórico)
+        # 12. Gerar próxima pergunta
         question_msg, question_event = await self._generate_question(responding_shark, answer)
         messages.append(question_msg)
         events.append(question_event)
         
-        # 9. Atualizar fase se necessário
+        # 13. Atualizar fase
         if self.turn_count > 8:
             self.phase = "tension"
         if self.turn_count > 15:
             self.phase = "closing"
         
-        # 10. Reading hint (se habilitado)
+        # 14. Reading hint
         reading_hint = None
-        if self.turn_count % 3 == 0:  # A cada 3 turnos
+        if self.turn_count % 3 == 0:
             reading_hint = self._generate_reading_hint()
         
         return OrchestratorResponse(
@@ -635,7 +609,554 @@ class Orchestrator:
             events=events,
             session_status=SessionStatus.IN_PROGRESS,
             can_user_respond=True,
-            reading_hint=reading_hint
+            reading_hint=reading_hint,
+            session_phase=self.session_phase,
+            active_offers=self.active_offers,
+            awaiting_founder_action=len(self.active_offers) > 0
+        )
+    
+    async def process_founder_action(self, action_request: FounderActionRequest) -> OrchestratorResponse:
+        """Processa a ação do founder em resposta a uma oferta"""
+        messages: List[MessageResponse] = []
+        events: List[EventResponse] = []
+        
+        # Carregar ofertas ativas
+        await self.load_active_offers()
+        
+        # Encontrar a oferta alvo
+        target_offer = None
+        for offer in self.active_offers:
+            if offer.id == action_request.offer_id:
+                target_offer = offer
+                break
+        
+        if not target_offer:
+            raise ValueError("Oferta não encontrada")
+        
+        # Encontrar o shark da oferta
+        offering_shark = None
+        for shark in self.sharks:
+            if shark.shark_id == target_offer.shark_id:
+                offering_shark = shark
+                break
+        
+        if action_request.action == FounderAction.ACCEPT:
+            return await self._handle_accept(target_offer, offering_shark, messages, events)
+        
+        elif action_request.action == FounderAction.REJECT:
+            return await self._handle_reject(target_offer, offering_shark, messages, events)
+        
+        elif action_request.action == FounderAction.COUNTER:
+            return await self._handle_counter(
+                target_offer, 
+                offering_shark, 
+                action_request.counter_offer,
+                messages, 
+                events
+            )
+        
+        elif action_request.action == FounderAction.WAIT:
+            return await self._handle_wait(target_offer, offering_shark, messages, events)
+        
+        raise ValueError(f"Ação desconhecida: {action_request.action}")
+    
+    # === HANDLERS DE AÇÕES DO FOUNDER ===
+    
+    async def _handle_accept(
+        self, 
+        offer: Offer, 
+        shark: SharkAgent,
+        messages: List[MessageResponse],
+        events: List[EventResponse]
+    ) -> OrchestratorResponse:
+        """Processa aceitação de oferta"""
+        # Atualizar oferta
+        offer.status = OfferStatus.ACCEPTED
+        await self.save_offer(offer)
+        
+        # Gerar reação do shark
+        reaction = self.negotiation_manager.generate_accept_reaction(offer)
+        msg = await self._save_message(shark.archetype['name'], reaction, MessageType.DEAL_ANNOUNCEMENT)
+        messages.append(msg)
+        
+        # Evento de deal fechado
+        deal_event = await self._save_event(EventType.DEAL_CLOSED, shark.archetype['name'], {
+            "offer_id": offer.id,
+            "valor": offer.valor,
+            "equity": offer.equity,
+            "offer_type": offer.offer_type
+        })
+        events.append(deal_event)
+        
+        # Registrar deal
+        self.deals_closed.append({
+            "shark_name": shark.archetype['name'],
+            "valor": offer.valor,
+            "equity": offer.equity
+        })
+        
+        # Encerrar sessão com final cinematográfico
+        return await self._end_session_with_negotiation(messages, events, deal_just_closed=True)
+    
+    async def _handle_reject(
+        self,
+        offer: Offer,
+        shark: SharkAgent,
+        messages: List[MessageResponse],
+        events: List[EventResponse]
+    ) -> OrchestratorResponse:
+        """Processa rejeição de oferta"""
+        # Decidir se shark vai ficar ou sair
+        will_stay = shark.state.interest > 70 and random.random() < 0.4
+        
+        # Atualizar oferta
+        offer.status = OfferStatus.REJECTED
+        await self.save_offer(offer)
+        
+        # Evento de rejeição
+        reject_event = await self._save_event(EventType.FOUNDER_REJECTED, "FOUNDER", {
+            "offer_id": offer.id,
+            "shark": shark.archetype['name']
+        })
+        events.append(reject_event)
+        
+        # Gerar reação do shark
+        reaction = self.negotiation_manager.generate_reject_reaction(shark.archetype['id'], will_stay)
+        msg = await self._save_message(shark.archetype['name'], reaction, MessageType.SHARK_REACTION)
+        messages.append(msg)
+        
+        # Se shark não vai ficar, sair
+        if not will_stay:
+            shark.state.is_out = True
+            await self.db.session_sharks.update_one(
+                {"session_id": self.session_id, "archetype_name": shark.archetype['name']},
+                {"$set": {"state": shark.state.model_dump(), "is_out": True}}
+            )
+            out_event = await self._save_event(EventType.SHARK_OUT, shark.archetype['name'], {
+                "reason": "Oferta rejeitada"
+            })
+            events.append(out_event)
+        else:
+            # Shark fica mas perde paciência
+            shark.state.patience -= 15
+            shark.confianca -= 10
+        
+        # Remover da lista de ofertas ativas
+        self.active_offers = [o for o in self.active_offers if o.id != offer.id]
+        
+        # Verificar se ainda há ofertas ativas
+        if not self.active_offers:
+            self.session_phase = SessionPhase.PITCHING
+        
+        # Outros sharks podem reagir
+        await self._other_sharks_react_to_rejection(shark, messages, events)
+        
+        return OrchestratorResponse(
+            messages=messages,
+            events=events,
+            session_status=SessionStatus.IN_PROGRESS,
+            can_user_respond=True,
+            session_phase=self.session_phase,
+            active_offers=self.active_offers,
+            awaiting_founder_action=len(self.active_offers) > 0
+        )
+    
+    async def _handle_counter(
+        self,
+        offer: Offer,
+        shark: SharkAgent,
+        counter: CounterOffer,
+        messages: List[MessageResponse],
+        events: List[EventResponse]
+    ) -> OrchestratorResponse:
+        """Processa contra-proposta do founder"""
+        # Evento de contra-proposta
+        counter_event = await self._save_event(EventType.FOUNDER_COUNTERED, "FOUNDER", {
+            "offer_id": offer.id,
+            "counter_valor": counter.valor,
+            "counter_equity": counter.equity,
+            "message": counter.message
+        })
+        events.append(counter_event)
+        
+        # Mensagem do founder
+        founder_msg = f"Eu tenho uma contra-proposta: {counter.valor} por {counter.equity}."
+        if counter.message:
+            founder_msg += f" {counter.message}"
+        msg = await self._save_message("FOUNDER", founder_msg, MessageType.COUNTER_OFFER)
+        messages.append(msg)
+        
+        # Shark avalia contra-proposta
+        accepted = self.negotiation_manager.evaluate_counter_offer(
+            offer, counter, shark.state.interest, shark.confianca
+        )
+        
+        # Gerar reação
+        reaction = self.negotiation_manager.generate_counter_reaction(accepted, offer, counter)
+        reaction_msg = await self._save_message(shark.archetype['name'], reaction, MessageType.SHARK_REACTION)
+        messages.append(reaction_msg)
+        
+        if accepted:
+            # Atualizar oferta com novos valores
+            offer.valor = counter.valor
+            offer.equity = counter.equity
+            offer.status = OfferStatus.ACCEPTED
+            await self.save_offer(offer)
+            
+            # Deal fechado
+            deal_event = await self._save_event(EventType.DEAL_CLOSED, shark.archetype['name'], {
+                "offer_id": offer.id,
+                "valor": counter.valor,
+                "equity": counter.equity,
+                "was_counter": True
+            })
+            events.append(deal_event)
+            
+            self.deals_closed.append({
+                "shark_name": shark.archetype['name'],
+                "valor": counter.valor,
+                "equity": counter.equity
+            })
+            
+            return await self._end_session_with_negotiation(messages, events, deal_just_closed=True)
+        else:
+            # Shark mantém ou rejeita
+            # Oferta original ainda está na mesa
+            offer.turns_remaining = max(1, offer.turns_remaining - 1)
+            await self.save_offer(offer)
+            
+            return OrchestratorResponse(
+                messages=messages,
+                events=events,
+                session_status=SessionStatus.IN_PROGRESS,
+                can_user_respond=True,
+                session_phase=self.session_phase,
+                active_offers=self.active_offers,
+                awaiting_founder_action=True
+            )
+    
+    async def _handle_wait(
+        self,
+        offer: Offer,
+        shark: SharkAgent,
+        messages: List[MessageResponse],
+        events: List[EventResponse]
+    ) -> OrchestratorResponse:
+        """Processa quando founder escolhe esperar"""
+        # Evento
+        wait_event = await self._save_event(EventType.FOUNDER_WAITED, "FOUNDER", {
+            "offer_id": offer.id
+        })
+        events.append(wait_event)
+        
+        # Shark reage
+        reaction = self.negotiation_manager.generate_wait_reaction(shark.archetype['id'])
+        msg = await self._save_message(shark.archetype['name'], reaction, MessageType.SHARK_REACTION)
+        messages.append(msg)
+        
+        # Aumentar fadiga de todos os sharks
+        for s in self.sharks:
+            if not s.state.is_out:
+                s.state.patience -= 8
+                s.fadiga += 5
+        
+        # Decrementar validade de todas as ofertas
+        for o in self.active_offers:
+            o.turns_remaining -= 1
+            await self.save_offer(o)
+        
+        # Verificar se outras sharks querem fazer oferta
+        active_sharks = [s for s in self.sharks if not s.state.is_out and s.shark_id != shark.shark_id]
+        await self._try_generate_offer(active_sharks, messages, events)
+        
+        # Conflito entre sharks
+        if len(self.active_offers) > 1:
+            await self._generate_shark_conflict(messages, events)
+        
+        return OrchestratorResponse(
+            messages=messages,
+            events=events,
+            session_status=SessionStatus.IN_PROGRESS,
+            can_user_respond=True,
+            session_phase=self.session_phase,
+            active_offers=self.active_offers,
+            awaiting_founder_action=len(self.active_offers) > 0
+        )
+    
+    # === MÉTODOS AUXILIARES DE NEGOCIAÇÃO ===
+    
+    async def _try_generate_offer(
+        self, 
+        active_sharks: List[SharkAgent],
+        messages: List[MessageResponse],
+        events: List[EventResponse]
+    ) -> Optional[Offer]:
+        """Tenta gerar uma nova oferta se condições forem atendidas"""
+        # Sharks que já têm oferta ativa não fazem outra
+        sharks_with_offers = {o.shark_id for o in self.active_offers}
+        eligible_sharks = [
+            s for s in active_sharks 
+            if s.shark_id not in sharks_with_offers
+            and s.state.interest >= 75 
+            and s.confianca >= 45
+        ]
+        
+        if not eligible_sharks:
+            return None
+        
+        for shark in eligible_sharks:
+            # Probabilidade baseada no interesse (MUITO MAIS RARA)
+            base_prob = 0.08  # 8% base (era 20%)
+            if shark.state.interest >= 90:
+                base_prob = 0.15  # 15% (era 35%)
+            if shark.state.interest >= 100:
+                base_prob = 0.25  # 25% (era 50%)
+            
+            # Multiplicador temporal
+            if self.turn_count >= 10:
+                base_prob *= 1.2
+            if self.turn_count >= 14:
+                base_prob *= 1.3
+            
+            if random.random() < base_prob:
+                # Criar oferta
+                offer = self.negotiation_manager.create_offer(
+                    shark_id=shark.shark_id,
+                    shark_name=shark.archetype['name'],
+                    shark_archetype=shark.archetype['id'],
+                    interest=shark.state.interest,
+                    confianca=shark.confianca,
+                    patience=shark.state.patience,
+                    turn_count=self.turn_count
+                )
+                
+                # Salvar no banco
+                await self.save_offer(offer)
+                self.active_offers.append(offer)
+                self.total_offers_made += 1
+                
+                # Atualizar estado do shark
+                shark.state.has_active_offer = True
+                shark.state.offer_id = offer.id
+                
+                # Gerar fala
+                speech = self.negotiation_manager.generate_offer_speech(offer, shark.archetype['id'])
+                msg = await self._save_message(shark.archetype['name'], speech, MessageType.OFFER)
+                messages.append(msg)
+                
+                # Evento
+                offer_event = await self._save_event(EventType.SHARK_OFFER, shark.archetype['name'], {
+                    "offer_id": offer.id,
+                    "offer_type": offer.offer_type,
+                    "valor": offer.valor,
+                    "equity": offer.equity,
+                    "turns_remaining": offer.turns_remaining
+                })
+                events.append(offer_event)
+                
+                return offer
+        
+        return None
+    
+    async def _update_offers_validity(
+        self,
+        messages: List[MessageResponse],
+        events: List[EventResponse]
+    ) -> List[Offer]:
+        """Atualiza validade das ofertas e retira as expiradas"""
+        expired = []
+        
+        for offer in self.active_offers[:]:
+            offer.turns_remaining -= 1
+            
+            if offer.turns_remaining <= 0:
+                # Oferta expirou
+                offer.status = OfferStatus.WITHDRAWN
+                offer.withdrawn_at_turn = self.turn_count
+                await self.save_offer(offer)
+                
+                # Encontrar shark
+                shark = next((s for s in self.sharks if s.shark_id == offer.shark_id), None)
+                if shark:
+                    speech = self.negotiation_manager.generate_withdrawal_speech(shark.archetype['id'])
+                    msg = await self._save_message(shark.archetype['name'], speech, MessageType.OFFER_WITHDRAWN)
+                    messages.append(msg)
+                    
+                    # Atualizar estado
+                    shark.state.has_active_offer = False
+                    shark.state.offer_id = None
+                
+                # Evento
+                withdraw_event = await self._save_event(EventType.SHARK_OFFER_WITHDRAWN, offer.shark_name, {
+                    "offer_id": offer.id,
+                    "reason": "Tempo esgotado"
+                })
+                events.append(withdraw_event)
+                
+                expired.append(offer)
+                self.active_offers.remove(offer)
+                self.total_offers_withdrawn += 1
+            else:
+                await self.save_offer(offer)
+        
+        # Se não há mais ofertas, voltar para PITCHING
+        if not self.active_offers and self.session_phase == SessionPhase.NEGOTIATION_WINDOW:
+            self.session_phase = SessionPhase.PITCHING
+        
+        return expired
+    
+    async def _add_offer_pressure(
+        self,
+        messages: List[MessageResponse],
+        events: List[EventResponse]
+    ):
+        """Adiciona pressão de sharks com ofertas ativas"""
+        for offer in self.active_offers:
+            if offer.turns_remaining <= 2 and random.random() < 0.5:
+                shark = next((s for s in self.sharks if s.shark_id == offer.shark_id), None)
+                if shark:
+                    speech = self.negotiation_manager.generate_pressure_speech(offer, offer.turns_remaining)
+                    msg = await self._save_message(shark.archetype['name'], speech, MessageType.OFFER_PRESSURE)
+                    messages.append(msg)
+    
+    async def _withdraw_offer_if_exists(
+        self,
+        shark: SharkAgent,
+        messages: List[MessageResponse],
+        events: List[EventResponse]
+    ):
+        """Retira oferta de um shark que está saindo"""
+        for offer in self.active_offers[:]:
+            if offer.shark_id == shark.shark_id:
+                offer.status = OfferStatus.WITHDRAWN
+                await self.save_offer(offer)
+                self.active_offers.remove(offer)
+                self.total_offers_withdrawn += 1
+                
+                withdraw_event = await self._save_event(EventType.SHARK_OFFER_WITHDRAWN, shark.archetype['name'], {
+                    "offer_id": offer.id,
+                    "reason": "Shark saiu"
+                })
+                events.append(withdraw_event)
+    
+    async def _other_sharks_react_to_rejection(
+        self,
+        rejected_shark: SharkAgent,
+        messages: List[MessageResponse],
+        events: List[EventResponse]
+    ):
+        """Outros sharks reagem à rejeição"""
+        active_sharks = [s for s in self.sharks if not s.state.is_out and s.shark_id != rejected_shark.shark_id]
+        
+        # 30% de chance de outro shark comentar
+        if active_sharks and random.random() < 0.3:
+            commenting_shark = random.choice(active_sharks)
+            comments = [
+                f"Você recusou porque acredita no valor ou porque não sabe onde está o limite?",
+                f"Interessante. Não é assim que eu jogaria, mas ok.",
+                f"Bom, isso muda a dinâmica da mesa."
+            ]
+            speech = random.choice(comments)
+            msg = await self._save_message(commenting_shark.archetype['name'], speech, MessageType.SHARK_REACTION)
+            messages.append(msg)
+    
+    async def _generate_shark_conflict(
+        self,
+        messages: List[MessageResponse],
+        events: List[EventResponse]
+    ):
+        """Gera conflito entre sharks quando há múltiplas ofertas"""
+        if len(self.active_offers) < 2:
+            return
+        
+        # 40% de chance de conflito
+        if random.random() < 0.4:
+            offer1 = self.active_offers[0]
+            offer2 = self.active_offers[1]
+            
+            shark1 = next((s for s in self.sharks if s.shark_id == offer1.shark_id), None)
+            shark2 = next((s for s in self.sharks if s.shark_id == offer2.shark_id), None)
+            
+            if shark1 and shark2:
+                speech = self.negotiation_manager.generate_shark_conflict(
+                    shark1.archetype['name'],
+                    shark2.archetype['name'],
+                    offer2
+                )
+                msg = await self._save_message(shark1.archetype['name'], speech, MessageType.SHARK_CONFLICT)
+                messages.append(msg)
+                
+                conflict_event = await self._save_event(EventType.SHARK_CONFLICT, shark1.archetype['name'], {
+                    "target_shark": shark2.archetype['name'],
+                    "target_offer_id": offer2.id
+                })
+                events.append(conflict_event)
+    
+    async def _end_session_with_negotiation(
+        self,
+        messages: List[MessageResponse],
+        events: List[EventResponse],
+        deal_just_closed: bool = False
+    ) -> OrchestratorResponse:
+        """Encerra a sessão com final cinematográfico"""
+        # Determinar tipo de final
+        try:
+            original_equity = self.negotiation_manager._parse_equity(self.pitch_data.get('pedido_equity', '10%'))
+        except:
+            original_equity = 10
+        
+        ending_type = self.negotiation_manager.determine_ending_type(
+            self.deals_closed,
+            self.total_offers_made,
+            self.total_offers_withdrawn,
+            original_equity
+        )
+        
+        # Gerar narração
+        narration = self.negotiation_manager.generate_ending_narration(
+            ending_type,
+            self.deals_closed,
+            self.total_offers_made
+        )
+        
+        # Mensagem de narração
+        narration_msg = await self._save_message("NARRADOR", narration, MessageType.NARRATION)
+        messages.append(narration_msg)
+        
+        # Evento de fim
+        end_event = await self._save_event(EventType.SESSION_ENDED, "SYSTEM", {
+            "turn_count": self.turn_count,
+            "ending_type": ending_type,
+            "deals_closed": len(self.deals_closed),
+            "offers_made": self.total_offers_made,
+            "offers_withdrawn": self.total_offers_withdrawn
+        })
+        events.append(end_event)
+        
+        # Atualizar sessão no banco
+        await self.db.sessions.update_one(
+            {"id": self.session_id},
+            {"$set": {
+                "status": SessionStatus.COMPLETED,
+                "ending_type": ending_type,
+                "deals_closed": self.deals_closed,
+                "total_offers_made": self.total_offers_made
+            }}
+        )
+        
+        return OrchestratorResponse(
+            messages=messages,
+            events=events,
+            session_status=SessionStatus.COMPLETED,
+            can_user_respond=False,
+            session_phase=SessionPhase.CLOSING,
+            active_offers=[],
+            awaiting_founder_action=False,
+            ending={
+                "type": ending_type,
+                "narration": narration,
+                "deals": self.deals_closed
+            }
         )
     
     async def _generate_question(self, shark: SharkAgent, previous_answer: str) -> tuple:
