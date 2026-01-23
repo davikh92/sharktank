@@ -270,6 +270,42 @@ class SharkAgent:
         
         return max(0, min(100, health))
     
+    def get_display_state(self, has_active_offer: bool = False, is_negotiating: bool = False, just_asked_question: bool = False) -> str:
+        """
+        Calcula o estado de exibição granular do shark
+        Retorna: ACTIVE, INTERESTED, SKEPTICAL, WAITING_RESPONSE, OFFER_MADE, NEGOTIATING, LOSING_PATIENCE, LAST_CHANCE, OUT
+        """
+        if self.state.is_out:
+            return "OUT"
+        
+        # Se está em última chance (Recovery Window)
+        if self.state.in_recovery_window:
+            return "LAST_CHANCE"
+        
+        # Se fez oferta ativa
+        if has_active_offer:
+            if is_negotiating:
+                return "NEGOTIATING"
+            return "OFFER_MADE"
+        
+        # Se acabou de fazer pergunta
+        if just_asked_question:
+            return "WAITING_RESPONSE"
+        
+        # Baseado em interesse e paciência
+        health = self._calculate_health()
+        
+        if health < 30 or self.state.patience < 20:
+            return "LOSING_PATIENCE"
+        
+        if self.state.interest < 35:
+            return "SKEPTICAL"
+        
+        if self.state.interest >= 70:
+            return "INTERESTED"
+        
+        return "ACTIVE"
+    
     def should_interrupt(self, turn_count: int) -> bool:
         """Decide se o shark deve interromper"""
         if self.state.is_out:
