@@ -53,10 +53,14 @@ class SharkAgent:
         self.archetype = archetype_data
         self.state = initial_state if initial_state else SharkState()
         self.session_context = session_context
-        self.conversation_memory: List[str] = []
         
-        # Nova camada: memória ponderada
+        # CARREGAR memória de conversa do state persistido
+        self.conversation_memory: List[str] = self.state.conversation_memory.copy() if self.state.conversation_memory else []
+        
+        # Nova camada: memória ponderada - CARREGAR do state persistido
         self.response_memory = ResponseMemory()
+        if self.state.response_memory_history:
+            self.response_memory.history = self.state.response_memory_history.copy()
         
         # Usar valores do state se fornecido
         self.confianca = self.state.confianca
