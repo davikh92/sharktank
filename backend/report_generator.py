@@ -1082,3 +1082,113 @@ class ReportGenerator:
             autopsia["decisao_que_matou"] = "Havia interesse, mas não houve conversão. Alguma coisa no meio do caminho travou."
         
         return autopsia
+
+
+    def _generate_contrafactual(self, events: List[Dict], sharks: List[Dict], messages: List[Dict], 
+                                offers: List[Dict], deals: List[Dict], ending_type: str) -> List[Dict[str, str]]:
+        """
+        Gera simulações contrafactuais - "O QUE ACONTECERIA SE..."
+        Não dá resposta pronta, só abre loop mental.
+        """
+        contrafactuais = []
+        
+        # Encontrar eventos-chave
+        shark_out_events = [e for e in events if e.get('event_type') == EventType.SHARK_OUT]
+        offer_events = [e for e in events if e.get('event_type') == EventType.SHARK_OFFER]
+        rejection_events = [e for e in events if e.get('event_type') == EventType.FOUNDER_REJECTED]
+        wait_events = [e for e in events if e.get('event_type') == EventType.FOUNDER_WAITED]
+        evasive_events = [e for e in events if e.get('event_type') == EventType.ANSWER_EVASIVE]
+        
+        # Contar turnos aproximados
+        question_events = [e for e in events if e.get('event_type') == EventType.QUESTION_ASKED]
+        total_turnos = len(question_events)
+        
+        # 1. Se houve resposta evasiva, contrafactual sobre clareza
+        if evasive_events:
+            first_evasive_turno = len([e for e in events if events.index(e) < events.index(evasive_events[0]) and e.get('event_type') == EventType.QUESTION_ASKED])
+            contrafactuais.append({
+                "hipotese": f"Se você tivesse sido direto no turno {first_evasive_turno + 1}...",
+                "consequencia": "...talvez o interesse da mesa não tivesse começado a cair ali.",
+                "reflexao": "Respostas evasivas não compram tempo. Elas custam confiança."
+            })
+        
+        # 2. Se houve saída de shark, contrafactual sobre o que poderia ter mantido
+        if shark_out_events:
+            first_out = shark_out_events[0]
+            shark_name = first_out.get('actor', 'um investidor')
+            out_turno = len([e for e in events if events.index(e) < events.index(first_out) and e.get('event_type') == EventType.QUESTION_ASKED])
+            
+            # Verificar arquétipo para sugestão específica
+            shark_data = next((s for s in sharks if s.get('archetype_name') == shark_name), None)
+            if shark_data:
+                archetype_id = shark_data.get('archetype_id', '')
+                if archetype_id == 'operador':
+                    detalhe = "clareza sobre quem executa"
+                elif archetype_id == 'financeiro':
+                    detalhe = "um número concreto"
+                elif archetype_id == 'cetico':
+                    detalhe = "um diferencial defensável"
+                else:
+                    detalhe = "uma visão mais ousada"
+                
+                contrafactuais.append({
+                    "hipotese": f"Se você tivesse trazido {detalhe} antes do turno {out_turno + 1}...",
+                    "consequencia": f"...{shark_name} provavelmente teria ficado mais 2-3 turnos.",
+                    "reflexao": "Cada shark busca algo específico. A pergunta é: você entregou o que ele precisava ver?"
+                })
+        
+        # 3. Se houve rejeição de oferta sem deal
+        if rejection_events and not deals:
+            rejected_shark = rejection_events[0].get('data', {}).get('shark', 'um investidor')
+            contrafactuais.append({
+                "hipotese": f"Se você tivesse aceitado a oferta de {rejected_shark}...",
+                "consequencia": "...você teria saído com investimento. Mas a que preço?",
+                "reflexao": "Recusar às vezes é estratégia. Às vezes é orgulho. Só você sabe qual foi."
+            })
+        
+        # 4. Se houve muita espera
+        if len(wait_events) >= 2:
+            contrafactuais.append({
+                "hipotese": "Se você tivesse decidido mais rápido quando tinha oferta na mesa...",
+                "consequencia": "...a pressão não teria aumentado e outras ofertas poderiam ter surgido.",
+                "reflexao": "Em negociação, tempo é recurso. Esperar custa paciência alheia."
+            })
+        
+        # 5. Se não houve ofertas
+        if not offer_events:
+            # Analisar qual shark chegou mais perto
+            best_shark = max(sharks, key=lambda s: s.get('state', {}).get('interest', 0))
+            best_interest = best_shark.get('state', {}).get('interest', 50)
+            
+            if best_interest > 55:
+                shark_name = best_shark.get('archetype_name', 'um investidor')
+                contrafactuais.append({
+                    "hipotese": f"Se você tivesse insistido mais nas respostas para {shark_name}...",
+                    "consequencia": f"...o interesse de {round(best_interest)}% poderia ter virado oferta.",
+                    "reflexao": "Quase lá não conta. Mas mostra que havia algo."
+                })
+            else:
+                contrafactuais.append({
+                    "hipotese": "Se você tivesse apresentado tração mais concreta desde o início...",
+                    "consequencia": "...talvez pelo menos um shark tivesse feito oferta.",
+                    "reflexao": "Sem números, fica difícil acreditar. Investidores precisam de evidência."
+                })
+        
+        # 6. Se houve oferta mas não fechou
+        if offer_events and not deals and ending_type != 'TABLE_BROKEN':
+            contrafactuais.append({
+                "hipotese": "Se você tivesse contra-ofertado em vez de esperar...",
+                "consequencia": "...poderia ter encontrado um meio-termo antes da paciência acabar.",
+                "reflexao": "Negociação é movimento. Quem fica parado, perde impulso."
+            })
+        
+        # 7. Contrafactual específico para mesa quebrada
+        if ending_type == 'TABLE_BROKEN':
+            contrafactuais.append({
+                "hipotese": "Se você tivesse tomado a decisão um turno antes...",
+                "consequencia": "...as ofertas ainda estariam na mesa. A indecisão custou tudo.",
+                "reflexao": "A janela fechou. E não porque os sharks desistiram — porque você não agiu."
+            })
+        
+        # Limitar a 3-4 contrafactuais mais relevantes
+        return contrafactuais[:4]
