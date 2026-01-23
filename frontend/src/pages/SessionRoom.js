@@ -297,25 +297,46 @@ const SessionRoom = () => {
           {/* Sharks Panel */}
           <div className="grid grid-cols-4 gap-4" data-testid="sharks-panel">
             {session.sharks && session.sharks.map((shark, idx) => {
-              const isOut = shark.state?.is_out || false;
+              // Verificar se shark está OUT baseado nos eventos (fonte primária de verdade)
+              const isOut = sharksOutSet.has(shark.archetype_name) || shark.state?.is_out || false;
               const hasOffer = activeOffers.some(o => o.shark_name === shark.archetype_name);
               return (
                 <div
                   key={idx}
-                  className={`panel-seat rounded-lg p-4 text-center ${isOut ? 'out' : ''} ${hasOffer ? 'ring-2 ring-green-500' : ''}`}
+                  className={`panel-seat rounded-lg p-4 text-center transition-all duration-500 ${
+                    isOut 
+                      ? 'opacity-40 bg-red-900/20 border border-red-900/50' 
+                      : hasOffer 
+                        ? 'ring-2 ring-green-500' 
+                        : ''
+                  }`}
                   data-testid={`shark-panel-${shark.archetype_name.toLowerCase().replace(/\s/g, '-')}`}
                 >
-                  <div className={`w-16 h-16 mx-auto mb-3 rounded-full flex items-center justify-center ${hasOffer ? 'bg-green-900' : 'bg-gray-700'}`}>
-                    <span className="text-2xl">{shark.archetype_name.charAt(0)}</span>
+                  <div className={`w-16 h-16 mx-auto mb-3 rounded-full flex items-center justify-center transition-colors ${
+                    isOut 
+                      ? 'bg-red-900/50' 
+                      : hasOffer 
+                        ? 'bg-green-900' 
+                        : 'bg-gray-700'
+                  }`}>
+                    <span className={`text-2xl ${isOut ? 'opacity-50' : ''}`}>
+                      {shark.archetype_name.charAt(0)}
+                    </span>
                   </div>
-                  <h3 className="text-white font-semibold text-sm mb-1">
+                  <h3 className={`font-semibold text-sm mb-1 ${isOut ? 'text-gray-500 line-through' : 'text-white'}`}>
                     {shark.archetype_name}
                   </h3>
                   <span 
-                    className={`text-xs ${isOut ? 'text-red-400' : hasOffer ? 'text-green-400' : 'text-gray-400'}`}
+                    className={`text-xs font-bold ${
+                      isOut 
+                        ? 'text-red-400' 
+                        : hasOffer 
+                          ? 'text-green-400' 
+                          : 'text-gray-400'
+                    }`}
                     data-testid={`shark-status-${shark.archetype_name.toLowerCase().replace(/\s/g, '-')}`}
                   >
-                    {isOut ? 'OUT' : hasOffer ? 'OFERTA' : 'ATIVO'}
+                    {isOut ? '✗ OUT' : hasOffer ? '💰 OFERTA' : '● ATIVO'}
                   </span>
                 </div>
               );
